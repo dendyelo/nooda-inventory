@@ -1,4 +1,4 @@
-// File: supabase/functions/record-sale/index.ts (v2 - LENGKAP & BENAR)
+// File: supabase/functions/record-sale/index.ts (v5.1 - Pengelompokan Error)
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -8,7 +8,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Definisikan resep PENJUALAN di sini dengan SKU yang benar
+// Resep untuk komponen pelengkap yang ikut terjual bersama produk
 const SALE_RECIPES = {
   'DCP-MINI': ['Dus Mini', 'Microfiber'],
   'DCP-CORE': ['Dus Core/Pro', 'Microfiber'],
@@ -16,65 +16,136 @@ const SALE_RECIPES = {
 };
 
 serve(async (req ) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
 
   try {
-    const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
-    const { productId, quantity } = await req.json();
-    if (!productId || !quantity || quantity <= 0) throw new Error("Product ID and quantity are required.");
-
-    // 1. Ambil data produk yang dijual (termasuk SKU dan stok saat ini)
-    const { data: product, error: productError } = await supabaseAdmin
-      .from('products')
-      .select('id, sku, stock')
-      .eq('id', productId)
-      .single(); // .single() untuk mendapatkan satu objek, bukan array
-
-    if (productError) throw productError;
-    if (!product) throw new Error("Product not found.");
-
-    // 2. Validasi stok produk jadi
-    if (product.stock < quantity) {
-      throw new Error(`Insufficient stock for ${product.sku}. Required: ${quantity}, Available: ${product.stock}`);
+    // 1. Ambil dan sanitasi data input
+    const { cart: rawCart } = await req.json();
+    if (!rawCart || !Array.isArray(rawCart)) {
+      throw new Error("Data keranjang (cart) tidak valid.");
     }
 
-    // 3. Dapatkan resep penjualan berdasarkan SKU
-    const saleComponents = SALE_RECIPES[product.sku];
-    if (!saleComponents) throw new Error(`No sale recipe for SKU ${product.sku}`);
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
 
-    // 4. Ambil data stok komponen pelengkap
-    const { data: components, error: componentsError } = await supabaseAdmin
-      .from('components')
-      .select('id, name, stock')
-      .in('name', saleComponents);
-    if (componentsError) throw componentsError;
+    const cart = rawCart.map(item => ({
+      productId: parseInt(item.productId, 10),
+      quantity: parseInt(item.quantity, 10),
+    })).filter(item => item.quantity > 0);
 
-    // 5. Validasi stok komponen pelengkap & siapkan promise update
-    const updatePromises = [];
-    for (const comp of components) {
-      if (comp.stock < quantity) {
-        throw new Error(`Insufficient stock for ${comp.name}. Required: ${quantity}, Available: ${comp.stock}`);
+    if (cart.length === 0) {
+      throw new Error("Tidak ada item untuk dijual (kuantitas > 0).");
+    }
+
+    const productIds = cart.map(item => item.productId);
+
+    // 2. Ambil data SKU produk
+    const { data: productsData, error: productsError } = await supabaseAdmin
+      .from('products')
+      .select('id, sku')
+      .in('id', productIds);
+    if (productsError) throw productsError;
+    const productSkuMap = new Map(productsData.map(p => [p.id, p.sku]));
+
+    // 3. Panggil RPC untuk mengambil semua level stok yang relevan dalam 1 kali jalan
+    const { data: stockLevels, error: rpcError } = await supabaseAdmin
+      .rpc('get_stock_levels', { product_ids: productIds });
+    if (rpcError) throw rpcError;
+
+    const stockMap = new Map(stockLevels.map(s => [s.item_type + '_' + (s.item_sku || s.item_name), s.stock_level]));
+
+    // =================================================================
+    // LOGIKA VALIDASI BARU: KELOMPOKKAN ERROR
+    // =================================================================
+    const productErrors: string[] = [];
+    const componentErrors: string[] = [];
+
+    // 4. Validasi stok produk jadi
+    for (const item of cart) {
+      const sku = productSkuMap.get(item.productId);
+      if (!sku) {
+        productErrors.push(`SKU untuk produk ID ${item.productId} tidak ditemukan.`);
+        continue;
       }
+      const availableStock = stockMap.get('PRODUCT_' + sku);
+      if (availableStock === undefined || availableStock < item.quantity) {
+        productErrors.push(`Stok ${sku} tidak cukup (Dibutuhkan: ${item.quantity}, Tersedia: ${availableStock ?? 0})`);
+      }
+    }
+
+    // 5. Validasi stok komponen pelengkap
+    const componentTotals = new Map<string, number>();
+    for (const item of cart) {
+      const sku = productSkuMap.get(item.productId);
+      if (!sku) continue;
+      const recipe = SALE_RECIPES[sku] || [];
+      for (const compName of recipe) {
+        componentTotals.set(compName, (componentTotals.get(compName) || 0) + item.quantity);
+      }
+    }
+    for (const [name, totalNeeded] of componentTotals.entries()) {
+      const availableStock = stockMap.get('COMPONENT_' + name);
+      if (availableStock === undefined || availableStock < totalNeeded) {
+        componentErrors.push(`Stok ${name} tidak cukup (Dibutuhkan: ${totalNeeded}, Tersedia: ${availableStock ?? 0})`);
+      }
+    }
+
+    // 6. Periksa dan gabungkan error yang terkumpul
+    if (productErrors.length > 0 || componentErrors.length > 0) {
+      let combinedMessage = "";
+      if (productErrors.length > 0) {
+        combinedMessage += productErrors.join('\n');
+      }
+      if (productErrors.length > 0 && componentErrors.length > 0) {
+        combinedMessage += '\n\n';
+      }
+      if (componentErrors.length > 0) {
+        combinedMessage += componentErrors.join('\n');
+      }
+      throw new Error(combinedMessage);
+    }
+    // =================================================================
+    // AKHIR DARI LOGIKA VALIDASI BARU
+    // =================================================================
+
+    // 7. Jika semua validasi lolos, eksekusi semua pembaruan database
+    const updatePromises = [];
+
+    // Kurangi stok produk jadi
+    for (const item of cart) {
+      const sku = productSkuMap.get(item.productId);
+      const currentStock = stockMap.get('PRODUCT_' + sku);
       updatePromises.push(
-        supabaseAdmin.from('components').update({ stock: comp.stock - quantity }).eq('id', comp.id)
+        supabaseAdmin.from('products').update({ stock: currentStock - item.quantity }).eq('id', item.productId)
       );
     }
 
-    // 6. Tambahkan promise untuk mengurangi stok produk jadi itu sendiri
-    updatePromises.push(
-      supabaseAdmin.from('products').update({ stock: product.stock - quantity }).eq('id', product.id)
-    );
+    // Kurangi stok komponen pelengkap
+    for (const [name, totalNeeded] of componentTotals.entries()) {
+      const currentStock = stockMap.get('COMPONENT_' + name);
+      updatePromises.push(
+        supabaseAdmin.from('components').update({ stock: currentStock - totalNeeded }).eq('name', name)
+      );
+    }
 
-    // 7. Jalankan semua update
     const results = await Promise.all(updatePromises);
-    const errors = results.map(res => res.error).filter(Boolean);
-    if (errors.length > 0) throw new Error(`Failed to update stock: ${errors.map(e => e.message).join(', ')}`);
+    const dbErrors = results.map(res => res.error).filter(Boolean);
+    if (dbErrors.length > 0) {
+      throw new Error(`Gagal memperbarui stok di database: ${dbErrors.map(e => e.message).join(', ')}`);
+    }
 
-    return new Response(JSON.stringify({ message: `Sale of ${quantity} ${product.sku} recorded.` }), {
+    // 8. Kirim respons sukses
+    return new Response(JSON.stringify({ message: "Penjualan berhasil dicatat." }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200,
     });
 
   } catch (error) {
+    // Blok catch ini akan menangkap error gabungan dari validasi
+    console.error("!!! Error in record-sale function:", error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400,
     });

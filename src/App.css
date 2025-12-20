@@ -1,20 +1,24 @@
 /* ================================================== */
-/*        Gaya CSS Baru untuk Nooda Inventory         */
+/*        Gaya CSS Lengkap untuk Nooda Inventory      */
 /* ================================================== */
 
-/* ... (semua gaya dari :root hingga .App h2 tetap sama) ... */
+/* Variabel Warna dan Gaya Dasar */
 :root {
   --primary-color: #007bff;
   --primary-hover: #0056b3;
+  --success-color: #28a745;
+  --success-hover: #218838;
+  --warning-color: #ffc107;
+  --warning-hover: #e0a800;
+  --danger-color: #dc3545;
   --background-color: #f8f9fa;
   --text-color: #212529;
   --border-color: #dee2e6;
   --panel-bg: #ffffff;
-  --success-color: #28a745;
-  --danger-color: #dc3545;
   --shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
+/* Pengaturan Global untuk Body */
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
@@ -26,6 +30,7 @@ body {
   color: var(--text-color);
 }
 
+/* Kontainer Utama Aplikasi */
 .App {
   text-align: center;
   padding: 24px;
@@ -36,18 +41,10 @@ body {
 .App h1 {
   color: var(--primary-color);
   font-size: 2.5rem;
-  margin-bottom: 8px;
+  margin-bottom: 24px;
 }
 
-.App h2 {
-  font-size: 1.75rem;
-  color: #495057;
-  border-bottom: 2px solid var(--border-color);
-  padding-bottom: 8px;
-  margin-top: 40px;
-}
-
-/* PERUBAHAN: Kontainer untuk setiap bagian besar */
+/* Kontainer untuk setiap bagian besar (Produk Jadi & Bahan Baku) */
 .section-container {
   background-color: var(--panel-bg);
   border: 1px solid var(--border-color);
@@ -55,28 +52,26 @@ body {
   padding: 24px;
   margin-top: 40px;
   box-shadow: var(--shadow);
-}
-
-.section-container h2 {
-  margin-top: 0;
-  border-bottom: none;
   text-align: left;
 }
 
-/* Gaya Tabel yang Bersih */
+.section-container h2 {
+  font-size: 1.75rem;
+  color: #495057;
+  margin-top: 0;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* Gaya Tabel Stok Utama */
 .stock-table {
   width: 100%;
-  margin: 24px auto;
   border-collapse: collapse;
-  background-color: transparent; /* Tabel sekarang transparan karena sudah di dalam panel */
-  box-shadow: none;
-  border-radius: 0;
-  overflow: visible;
 }
 
 .stock-table th,
 .stock-table td {
-  border: none;
   padding: 16px;
   text-align: left;
   border-bottom: 1px solid var(--border-color);
@@ -100,35 +95,41 @@ body {
 
 /* Panel Aksi (Form) */
 .form-panel {
-  border: 2px dashed var(--border-color); /* Ubah border agar terlihat seperti zona aksi */
+  border: 2px dashed var(--border-color);
   padding: 24px;
   border-radius: 8px;
-  margin-top: 24px;
-  background-color: #f8f9fa;
+  margin-top: 32px;
+  background-color: #fdfdff;
 }
 
 .form-panel h3 {
   margin-top: 0;
-  text-align: left;
+  font-size: 1.5rem;
 }
 
 .form-panel form {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 16px;
-  flex-wrap: wrap; /* Agar responsif di layar kecil */
 }
 
-.form-panel select,
-.form-panel input {
-  flex-grow: 1; /* Biarkan input dan select memanjang */
+/* Gaya untuk Form Produksi */
+.production-panel form {
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.production-panel select,
+.production-panel input {
+  flex-grow: 1;
   padding: 12px;
   font-size: 1rem;
   border-radius: 6px;
   border: 1px solid var(--border-color);
 }
 
-.form-panel button {
+.production-panel button {
   padding: 12px 24px;
   font-size: 1rem;
   border-radius: 6px;
@@ -140,30 +141,67 @@ body {
   transition: background-color 0.2s ease-in-out;
 }
 
-/* PERUBAHAN: Gaya khusus untuk tombol penjualan dan produksi */
-.sale-panel button {
-  background-color: var(--success-color); /* Hijau untuk penjualan */
-}
-.sale-panel button:hover:not(:disabled) {
-  background-color: #218838;
-}
-
-.production-panel button {
-  background-color: var(--primary-color); /* Biru untuk produksi */
-}
 .production-panel button:hover:not(:disabled) {
   background-color: var(--primary-hover);
 }
 
-.form-panel button:disabled {
-  background-color: #6c757d;
-  cursor: not-allowed;
+/* Gaya untuk Form Penjualan (Tabel Input) */
+.sale-input-table {
+  width: 100%;
+  border-collapse: collapse;
 }
 
-/* PERUBAHAN: Gaya untuk tombol tambah stok di dalam tabel */
+.sale-input-table th, .sale-input-table td {
+  padding: 12px 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.sale-input-table th {
+  font-weight: 600;
+}
+
+.sale-input-table td:last-child {
+  text-align: right;
+}
+
+.quantity-input {
+  width: 80px;
+  padding: 8px;
+  text-align: center;
+  font-size: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+
+.quantity-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+/* Tombol Submit Penjualan */
+.submit-sale-btn {
+  width: 100%;
+  padding: 12px;
+  font-size: 1.1rem;
+  border-radius: 6px;
+  background-color: var(--success-color);
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  margin-top: 16px;
+}
+
+.submit-sale-btn:hover:not(:disabled) {
+  background-color: var(--success-hover);
+}
+
+/* Tombol Tambah Stok di dalam Tabel */
 .add-stock-btn {
-  background-color: #ffc107; /* Kuning */
-  color: #212529;
+  background-color: var(--warning-color);
+  color: var(--text-color);
   border: none;
   padding: 8px 12px;
   border-radius: 6px;
@@ -172,10 +210,13 @@ body {
   font-size: 0.9em;
   transition: background-color 0.2s;
 }
+
 .add-stock-btn:hover:not(:disabled) {
-  background-color: #e0a800;
+  background-color: var(--warning-hover);
 }
-.add-stock-btn:disabled {
-  background-color: #6c757d;
-  cursor: not-allowed;
+
+/* Status Tombol Disabled */
+button:disabled {
+  background-color: #6c757d !important; /* Paksa warna abu-abu saat disabled */
+  cursor: not-allowed !important;
 }

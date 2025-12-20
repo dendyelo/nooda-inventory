@@ -220,3 +220,30 @@ button:disabled {
   background-color: #6c757d !important; /* Paksa warna abu-abu saat disabled */
   cursor: not-allowed !important;
 }
+
+/* =================================================================
+   GAYA BARU UNTUK HIGHLIGHT STOK
+   ================================================================= */
+
+/* Kelas untuk stok kritis (mendekati habis) */
+.stock-warning {
+  background-color: #fff3cd !important; /* Warna kuning/oranye muda yang tidak terlalu mencolok */
+  font-weight: bold; /* Membuat teks sedikit lebih tebal */
+}
+
+/* Kelas untuk stok habis */
+.stock-danger {
+  background-color: #f8d7da !important; /* Warna merah muda yang lembut */
+  font-weight: bold;
+  color: #721c24; /* Warna teks merah tua agar kontras */
+}
+
+/* Pastikan warna highlight tetap terlihat saat di-hover */
+.stock-table tbody tr.stock-warning:hover,
+.stock-table tbody tr.stock-danger:hover {
+  background-color: #ffe8a1 !important; /* Oranye sedikit lebih gelap saat hover */
+}
+
+.stock-table tbody tr.stock-danger:hover {
+  background-color: #f1c6cb !important; /* Merah sedikit lebih gelap saat hover */
+}

@@ -1,4 +1,4 @@
-// File: src/App.tsx (v5.3 - Final dengan Format Error Sederhana)
+// File: src/App.tsx (v5.5 - Final dengan Aturan Highlight Stok Kustom)
 
 import { useState, useEffect, type FormEvent } from 'react';
 import { supabase } from './lib/supabaseClient';
@@ -37,6 +37,30 @@ export default function App() {
     if (indexA !== -1) return -1;
     if (indexB !== -1) return 1;
     return a.name.localeCompare(b.name);
+  };
+
+  // Fungsi helper cerdas untuk menentukan kelas CSS berdasarkan aturan stok kustom
+  const getStockRowClass = (stock: number, name: string): string => {
+    // Daftar item dengan aturan khusus (limit 2)
+    const specialItems = ['Buble Warp', 'Lakban Bening', 'Lakban Fragile'];
+    
+    // Aturan default
+    let warningLimit = 20;
+
+    // Jika nama item ada di dalam daftar khusus, ubah limitnya
+    if (specialItems.includes(name)) {
+      warningLimit = 2;
+    }
+
+    // Terapkan logika dengan limit yang sudah disesuaikan
+    if (stock === 0) {
+      return 'stock-danger'; // Stok habis -> merah (berlaku untuk semua)
+    }
+    if (stock < warningLimit) {
+      return 'stock-warning'; // Stok kritis -> oranye (menggunakan limit yang benar)
+    }
+    
+    return ''; // Stok aman -> tidak ada kelas tambahan
   };
 
   // Fungsi untuk mengambil semua data dari Supabase
@@ -90,7 +114,6 @@ export default function App() {
         errorMessage = caughtError.message;
       }
       
-      // Format pesan error sederhana, karena backend sudah menangani spasi
       const formattedErrorMessage = `GAGAL:\n${errorMessage}`;
       alert(formattedErrorMessage);
       
@@ -181,7 +204,11 @@ export default function App() {
           <thead><tr><th>Produk</th><th>SKU</th><th>Stok Tersedia</th></tr></thead>
           <tbody>
             {products.sort(sortProducts).map(p => (
-              <tr key={p.id}><td>{p.name}</td><td>{p.sku}</td><td>{p.stock}</td></tr>
+              <tr key={p.id} className={getStockRowClass(p.stock, p.name)}>
+                <td>{p.name}</td>
+                <td>{p.sku}</td>
+                <td>{p.stock}</td>
+              </tr>
             ))}
           </tbody>
         </table>
@@ -210,7 +237,12 @@ export default function App() {
           <thead><tr><th>Komponen</th><th>Stok</th><th>Satuan</th><th>Aksi</th></tr></thead>
           <tbody>
             {components.map(c => (
-              <tr key={c.id}><td>{c.name}</td><td>{c.stock}</td><td>{c.unit}</td><td><button className="add-stock-btn" onClick={() => handleAddComponentStock(c)} disabled={isSubmitting}>+ Tambah</button></td></tr>
+              <tr key={c.id} className={getStockRowClass(c.stock, c.name)}>
+                <td>{c.name}</td>
+                <td>{c.stock}</td>
+                <td>{c.unit}</td>
+                <td><button className="add-stock-btn" onClick={() => handleAddComponentStock(c)} disabled={isSubmitting}>+ Tambah</button></td>
+              </tr>
             ))}
           </tbody>
         </table>

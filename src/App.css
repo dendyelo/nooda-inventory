@@ -11,6 +11,9 @@
   --warning-color: #ffc107;
   --warning-hover: #e0a800;
   --danger-color: #dc3545;
+  --danger-hover: #c82333;
+  --danger-light: #f8d7da;
+  --danger-dark: #721c24;
   --background-color: #f8f9fa;
   --text-color: #212529;
   --border-color: #dee2e6;
@@ -75,6 +78,7 @@ body {
   padding: 16px;
   text-align: left;
   border-bottom: 1px solid var(--border-color);
+  vertical-align: middle;
 }
 
 .stock-table th {
@@ -198,52 +202,86 @@ body {
   background-color: var(--success-hover);
 }
 
-/* Tombol Tambah Stok di dalam Tabel */
-.add-stock-btn {
-  background-color: var(--warning-color);
-  color: var(--text-color);
-  border: none;
-  padding: 8px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 600;
-  font-size: 0.9em;
-  transition: background-color 0.2s;
+/* =================================================================
+   GAYA BARU UNTUK TOMBOL AKSI TAMBAH/KURANG STOK (v4 - Profesional Biru & Abu-abu)
+   ================================================================= */
+.action-cell {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
-.add-stock-btn:hover:not(:disabled) {
-  background-color: var(--warning-hover);
+.modify-stock-btn {
+  border: none;
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: white; /* Warna teks putih untuk kontras terbaik */
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1); /* Bayangan halus */
 }
+
+.modify-stock-btn:hover:not(:disabled) {
+  transform: translateY(-2px); /* Efek terangkat saat hover */
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15); /* Bayangan lebih jelas saat hover */
+}
+
+.modify-stock-btn:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* Tombol Tambah (+) - Warna Biru Primer */
+.modify-stock-btn.add {
+  background-color: var(--primary-color); /* Menggunakan variabel --primary-color */
+}
+.modify-stock-btn.add:hover:not(:disabled) {
+  background-color: var(--primary-hover); /* Versi hover yang lebih gelap */
+}
+
+/* Tombol Kurang (-) - Warna Abu-abu Netral */
+.modify-stock-btn.subtract {
+  background-color: #6c757d; /* Warna abu-abu standar yang bagus */
+}
+.modify-stock-btn.subtract:hover:not(:disabled) {
+  background-color: #5a6268; /* Versi hover yang lebih gelap */
+}
+
 
 /* Status Tombol Disabled */
 button:disabled {
-  background-color: #6c757d !important; /* Paksa warna abu-abu saat disabled */
+  background-color: #e9ecef !important;
+  border-color: #dee2e6 !important;
+  color: #6c757d !important;
   cursor: not-allowed !important;
+  box-shadow: none !important;
+  transform: none !important;
 }
 
 /* =================================================================
-   GAYA BARU UNTUK HIGHLIGHT STOK
+   GAYA UNTUK HIGHLIGHT STOK (VERSI SPESIFIK)
    ================================================================= */
 
 /* Kelas untuk stok kritis (mendekati habis) */
-.stock-warning {
-  background-color: #fff3cd !important; /* Warna kuning/oranye muda yang tidak terlalu mencolok */
-  font-weight: bold; /* Membuat teks sedikit lebih tebal */
+.stock-table tbody tr.stock-warning {
+  background-color: #fff3cd;
+  font-weight: bold;
 }
 
 /* Kelas untuk stok habis */
-.stock-danger {
-  background-color: #f8d7da !important; /* Warna merah muda yang lembut */
+.stock-table tbody tr.stock-danger {
+  background-color: #f8d7da;
   font-weight: bold;
-  color: #721c24; /* Warna teks merah tua agar kontras */
+  color: var(--danger-dark);
 }
 
 /* Pastikan warna highlight tetap terlihat saat di-hover */
-.stock-table tbody tr.stock-warning:hover,
-.stock-table tbody tr.stock-danger:hover {
-  background-color: #ffe8a1 !important; /* Oranye sedikit lebih gelap saat hover */
+.stock-table tbody tr.stock-warning:hover {
+  background-color: #ffe8a1;
 }
 
 .stock-table tbody tr.stock-danger:hover {
-  background-color: #f1c6cb !important; /* Merah sedikit lebih gelap saat hover */
+  background-color: #f1c6cb;
 }

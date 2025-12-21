@@ -1,4 +1,4 @@
-// File: src/App.tsx (v5.5 - Final dengan Aturan Highlight Stok Kustom)
+// File: src/App.tsx (v5.6 - Final dengan Aksi Tambah/Kurang Stok)
 
 import { useState, useEffect, type FormEvent } from 'react';
 import { supabase } from './lib/supabaseClient';
@@ -41,26 +41,14 @@ export default function App() {
 
   // Fungsi helper cerdas untuk menentukan kelas CSS berdasarkan aturan stok kustom
   const getStockRowClass = (stock: number, name: string): string => {
-    // Daftar item dengan aturan khusus (limit 2)
     const specialItems = ['Buble Warp', 'Lakban Bening', 'Lakban Fragile'];
-    
-    // Aturan default
     let warningLimit = 20;
-
-    // Jika nama item ada di dalam daftar khusus, ubah limitnya
     if (specialItems.includes(name)) {
       warningLimit = 2;
     }
-
-    // Terapkan logika dengan limit yang sudah disesuaikan
-    if (stock === 0) {
-      return 'stock-danger'; // Stok habis -> merah (berlaku untuk semua)
-    }
-    if (stock < warningLimit) {
-      return 'stock-warning'; // Stok kritis -> oranye (menggunakan limit yang benar)
-    }
-    
-    return ''; // Stok aman -> tidak ada kelas tambahan
+    if (stock === 0) return 'stock-danger';
+    if (stock < warningLimit) return 'stock-warning';
+    return '';
   };
 
   // Fungsi untuk mengambil semua data dari Supabase
@@ -113,10 +101,8 @@ export default function App() {
       } else if (caughtError && caughtError.message) {
         errorMessage = caughtError.message;
       }
-      
       const formattedErrorMessage = `GAGAL:\n${errorMessage}`;
       alert(formattedErrorMessage);
-      
       return false;
     } finally {
       setIsSubmitting(false);
@@ -140,20 +126,37 @@ export default function App() {
     }
   };
 
-  // Fungsi untuk menambah stok bahan baku
-  const handleAddComponentStock = async (component: Component) => {
-    const amountStr = window.prompt(`Masukkan jumlah stok yang ingin ditambahkan untuk:\n${component.name}`, "10");
+  // Fungsi baru untuk menambah DAN mengurangi stok bahan baku
+  const handleModifyComponentStock = async (component: Component, action: 'add' | 'subtract') => {
+    const promptTitle = action === 'add' 
+      ? `Masukkan jumlah stok yang ingin DITAMBAHKAN untuk:\n${component.name}`
+      : `Masukkan jumlah stok yang ingin DIKURANGI untuk:\n${component.name}`;
+    
+    const amountStr = window.prompt(promptTitle, "0");
     if (amountStr === null) return;
+    
     const amount = parseInt(amountStr, 10);
     if (isNaN(amount) || amount <= 0) {
       alert("Harap masukkan angka positif yang valid.");
       return;
     }
-    const confirmed = window.confirm(`Anda yakin ingin menambah stok ${component.name} sebanyak ${amount}? Stok baru akan menjadi ${component.stock + amount}.`);
+
+    if (action === 'subtract' && amount > component.stock) {
+      alert(`GAGAL:\nAnda tidak bisa mengurangi lebih dari stok yang ada.\nStok saat ini: ${component.stock}, Anda mencoba mengurangi: ${amount}`);
+      return;
+    }
+
+    const newStock = action === 'add' ? component.stock + amount : component.stock - amount;
+    const confirmationMessage = action === 'add'
+      ? `Anda yakin ingin menambah stok ${component.name} sebanyak ${amount}?\nStok baru akan menjadi ${newStock}.`
+      : `Anda yakin ingin mengurangi stok ${component.name} sebanyak ${amount}?\nStok baru akan menjadi ${newStock}.`;
+
+    const confirmed = window.confirm(confirmationMessage);
     if (!confirmed) return;
+
     setIsSubmitting(true);
     try {
-      const { error } = await supabase.from('components').update({ stock: component.stock + amount }).eq('id', component.id);
+      const { error } = await supabase.from('components').update({ stock: newStock }).eq('id', component.id);
       if (error) throw error;
       alert("Stok berhasil diperbarui!");
       await fetchData();
@@ -241,7 +244,22 @@ export default function App() {
                 <td>{c.name}</td>
                 <td>{c.stock}</td>
                 <td>{c.unit}</td>
-                <td><button className="add-stock-btn" onClick={() => handleAddComponentStock(c)} disabled={isSubmitting}>+ Tambah</button></td>
+                <td className="action-cell">
+                  <button 
+                    className="modify-stock-btn subtract" 
+                    onClick={() => handleModifyComponentStock(c, 'subtract')} 
+                    disabled={isSubmitting || c.stock === 0}
+                  >
+                    -
+                  </button>
+                  <button 
+                    className="modify-stock-btn add" 
+                    onClick={() => handleModifyComponentStock(c, 'add')} 
+                    disabled={isSubmitting}
+                  >
+                    +
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>

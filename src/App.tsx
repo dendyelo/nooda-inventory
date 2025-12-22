@@ -1,4 +1,4 @@
-// File: src/App.tsx (v5.9 - Menambahkan Tampilan Versi)
+// File: src/App.tsx (v5.14 - Perbaikan Dialog Konfirmasi Penjualan)
 
 import { useState, useEffect, type FormEvent } from 'react';
 import { supabase } from './lib/supabaseClient';
@@ -7,33 +7,26 @@ import './App.css';
 // Tipe Data
 type Product = { id: number; name: string; sku: string; stock: number; };
 type Component = { id: number; name: string; stock: number; unit: string; };
-type ProductComponent = { product_id: number; component_id: number; quantity_needed: number; };
+// Menambahkan process_type ke tipe data agar TypeScript tahu
+type ProductComponent = { product_id: number; component_id: number; quantity_needed: number; process_type: 'PRODUCTION' | 'SALE'; };
+type ActivityLog = { id: number; created_at: string; description: string; };
 
-// Tipe data untuk state kuantitas penjualan
-type SaleQuantities = {
-  [productId: number]: number;
-};
+type SaleQuantities = { [productId: number]: number; };
 
 export default function App() {
-  // Konstanta Versi Aplikasi
-  const APP_VERSION = "v5.9";
+  const APP_VERSION = "v5.14";
 
-  // States
   const [components, setComponents] = useState<Component[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [productComponents, setProductComponents] = useState<ProductComponent[]>([]);
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-
-  // State untuk form penjualan tabel
   const [saleQuantities, setSaleQuantities] = useState<SaleQuantities>({});
-
-  // States untuk form produksi
   const [prodProductId, setProdProductId] = useState<string>('');
   const [prodQuantity, setProdQuantity] = useState<string>('');
 
-  // Fungsi untuk mengurutkan produk (Mini, Core, Pro)
   const sortProducts = (a: Product, b: Product): number => {
     const order = ['DCP-MINI', 'DCP-CORE', 'DCP-PRO'];
     const indexA = order.indexOf(a.sku);
@@ -44,35 +37,34 @@ export default function App() {
     return a.name.localeCompare(b.name);
   };
 
-  // Fungsi helper cerdas untuk menentukan kelas CSS berdasarkan aturan stok kustom
   const getStockRowClass = (stock: number, name: string): string => {
     const specialItems = ['Buble Warp', 'Lakban Bening', 'Lakban Fragile'];
     let warningLimit = 20;
-    if (specialItems.includes(name)) {
-      warningLimit = 2;
-    }
+    if (specialItems.includes(name)) warningLimit = 2;
     if (stock === 0) return 'stock-danger';
     if (stock < warningLimit) return 'stock-warning';
     return '';
   };
 
-  // Fungsi untuk mengambil semua data dari Supabase
   const fetchData = async () => {
     try {
-      const [compRes, prodRes, pcRes] = await Promise.all([
+      const [compRes, prodRes, pcRes, logRes] = await Promise.all([
         supabase.from('components').select('*').order('name'),
         supabase.from('products').select('*'),
-        supabase.from('product_components').select('*')
+        supabase.from('product_components').select('*'),
+        supabase.from('activity_logs').select('id, created_at, description').order('created_at', { ascending: false }).limit(20)
       ]);
       if (compRes.error) throw compRes.error;
       if (prodRes.error) throw prodRes.error;
       if (pcRes.error) throw pcRes.error;
+      if (logRes.error) throw logRes.error;
 
       setComponents(compRes.data || []);
       setProducts(prodRes.data || []);
       setProductComponents(pcRes.data || []);
+      setActivityLogs(logRes.data || []);
 
-      if (prodRes.data && prodRes.data.length > 0) {
+      if (prodRes.data?.length) {
         const sortedProducts = [...prodRes.data].sort(sortProducts);
         if (!prodProductId) setProdProductId(sortedProducts[0].id.toString());
       }
@@ -88,197 +80,156 @@ export default function App() {
     fetchData();
   }, []);
 
-  // Fungsi untuk memanggil Edge Function dengan penanganan error terbaik
   const invokeFunction = async (name: 'record-sale' | 'produce-dcp', body: object, successMessage: string): Promise<boolean> => {
     setIsSubmitting(true);
     try {
-      const { data, error } = await supabase.functions.invoke(name, { body });
+      const { error } = await supabase.functions.invoke(name, { body });
       if (error) throw error;
-      alert(data.message || successMessage);
+      alert(successMessage);
       await fetchData();
       return true;
     } catch (caughtError: any) {
-      let errorMessage = "Terjadi kesalahan yang tidak diketahui.";
-      if (caughtError && caughtError.context && typeof caughtError.context.json === 'function') {
+      let errorMessage = "Terjadi kesalahan.";
+      if (caughtError.context?.json) {
         try {
           const errorBody = await caughtError.context.json();
-          if (errorBody && errorBody.error) {
-            errorMessage = errorBody.error;
-          }
-        } catch (e) {
-          errorMessage = caughtError.message || "Gagal mem-parsing respons error.";
-        }
-      } else if (caughtError && caughtError.message) {
+          errorMessage = errorBody.error || errorMessage;
+        } catch { /* Gagal parsing, gunakan pesan default */ }
+      } else if (caughtError.message) {
         errorMessage = caughtError.message;
       }
-      const formattedErrorMessage = `GAGAL:\n${errorMessage}`;
-      alert(formattedErrorMessage);
+      alert(`GAGAL:\n${errorMessage}`);
       return false;
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Handler untuk form produksi (dengan konfirmasi detail)
   const handleProductionSubmit = (e: FormEvent) => {
     e.preventDefault();
     const quantity = parseInt(prodQuantity, 10);
     const productId = parseInt(prodProductId, 10);
 
     if (isNaN(productId) || isNaN(quantity) || quantity <= 0) {
-      alert("Harap pilih produk dan masukkan jumlah produksi yang valid (lebih dari 0).");
+      alert("Harap pilih produk dan masukkan jumlah produksi yang valid.");
       return;
     }
-
     const product = products.find(p => p.id === productId);
-    if (!product) {
-      alert("Produk yang dipilih tidak ditemukan.");
-      return;
+    if (!product) return;
+
+    let stockImpactSummary = '';
+    const relevantComponents: { name: string; needed: number }[] = [];
+
+    if (product.sku === 'DCP-MINI') {
+      relevantComponents.push({ name: 'Botol Mini', needed: 1 * quantity });
+    } else if (product.sku === 'DCP-CORE') {
+      relevantComponents.push({ name: 'Botol Core', needed: 1 * quantity });
+    } else if (product.sku === 'DCP-PRO') {
+      relevantComponents.push(
+        { name: 'Botol Pro', needed: 1 * quantity },
+        { name: 'Seal Pro', needed: 1 * quantity },
+        { name: 'Sprayer Pro', needed: 1 * quantity },
+        { name: 'Tutup Botol Pro', needed: 1 * quantity }
+      );
     }
 
-    const recipe = productComponents.filter(pc => pc.product_id === productId);
-    const stockImpactSummary = recipe
-      .map(recipeItem => {
-        const component = components.find(c => c.id === recipeItem.component_id);
-        if (!component) return null;
-        const totalNeeded = recipeItem.quantity_needed * quantity;
-        const newStock = component.stock - totalNeeded;
-        return `  - ${component.name}: ${component.stock} ${component.unit} -> ${newStock} ${component.unit}`;
-      })
-      .filter(line => line !== null)
-      .join('\n');
+    stockImpactSummary = relevantComponents.map(rc => {
+      const component = components.find(c => c.name === rc.name);
+      if (!component) return `  - ${rc.name}: Data tidak ditemukan`;
+      const newStock = component.stock - rc.needed;
+      return `  - ${component.name}: ${component.stock} -> ${newStock}`;
+    }).join('\n');
 
-    const confirmationMessage = `
-Anda akan menjalankan produksi untuk:
-
---- PRODUK DIBUAT ---
-${quantity}x ${product.name}
-(Stok akan berubah dari ${product.stock} -> ${product.stock + quantity})
-
---- KOMPONEN YANG DIGUNAKAN ---
-${stockImpactSummary.length > 0 ? stockImpactSummary : 'Tidak ada komponen yang digunakan.'}
-
-Aksi ini tidak dapat dibatalkan.
-    `;
-
-    const confirmed = window.confirm(confirmationMessage);
-    if (confirmed) {
-      invokeFunction('produce-dcp', { productId, quantity }, 'Produksi berhasil diselesaikan!')
-        .then(success => {
-          if (success) setProdQuantity('');
-        });
+    const confirmationMessage = `Anda akan memproduksi:\n\n${quantity}x ${product.name}\n\nIni akan mengubah stok komponen:\n${stockImpactSummary}\n\nLanjutkan?`;
+    
+    if (window.confirm(confirmationMessage)) {
+      invokeFunction('produce-dcp', { productId, quantity }, 'Produksi berhasil diselesaikan!').then(success => {
+        if (success) setProdQuantity('');
+      });
     }
   };
 
-  // Fungsi untuk menambah/mengurangi stok bahan baku
   const handleModifyComponentStock = async (component: Component, action: 'add' | 'subtract') => {
-    const promptTitle = action === 'add' 
-      ? `Masukkan jumlah stok yang ingin DITAMBAHKAN untuk:\n${component.name}`
-      : `Masukkan jumlah stok yang ingin DIKURANGI untuk:\n${component.name}`;
-    
-    const amountStr = window.prompt(promptTitle, "0");
+    const amountStr = window.prompt(`Masukkan jumlah untuk ${action === 'add' ? 'DITAMBAH' : 'DIKURANGI'}:\n${component.name}`, "0");
     if (amountStr === null) return;
-    
     const amount = parseInt(amountStr, 10);
     if (isNaN(amount) || amount <= 0) {
       alert("Harap masukkan angka positif yang valid.");
       return;
     }
-
     if (action === 'subtract' && amount > component.stock) {
-      alert(`GAGAL:\nAnda tidak bisa mengurangi lebih dari stok yang ada.\nStok saat ini: ${component.stock}, Anda mencoba mengurangi: ${amount}`);
+      alert(`GAGAL: Stok tidak mencukupi.`);
       return;
     }
 
     const newStock = action === 'add' ? component.stock + amount : component.stock - amount;
-    const confirmationMessage = action === 'add'
-      ? `Anda yakin ingin menambah stok ${component.name} sebanyak ${amount}?\nStok baru akan menjadi ${newStock}.`
-      : `Anda yakin ingin mengurangi stok ${component.name} sebanyak ${amount}?\nStok baru akan menjadi ${newStock}.`;
-
-    const confirmed = window.confirm(confirmationMessage);
-    if (!confirmed) return;
+    if (!window.confirm(`Ubah stok ${component.name} dari ${component.stock} menjadi ${newStock}?`)) return;
 
     setIsSubmitting(true);
     try {
       const { error } = await supabase.from('components').update({ stock: newStock }).eq('id', component.id);
       if (error) throw error;
+
+      const description = `Stok ${component.name} diubah dari ${component.stock} ${component.unit} menjadi ${newStock} ${component.unit}.`;
+      await supabase.from('activity_logs').insert({
+        action_type: 'STOCK_ADJUSTMENT',
+        description: description,
+        details: { component_id: component.id, old_stock: component.stock, new_stock: newStock }
+      });
+
       alert("Stok berhasil diperbarui!");
       await fetchData();
     } catch (err: any) {
-      alert(`Terjadi Kesalahan: ${err.message}`);
+      alert(`GAGAL:\n${err.message}`);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Handler untuk mengubah kuantitas di tabel penjualan
   const handleQuantityChange = (productId: number, quantityStr: string) => {
-    if (quantityStr === '') {
-      setSaleQuantities(prev => ({ ...prev, [productId]: 0 }));
-      return;
-    }
     const quantity = parseInt(quantityStr, 10);
-    const newQuantity = Math.max(0, quantity);
-    setSaleQuantities(prev => ({ ...prev, [productId]: newQuantity }));
+    setSaleQuantities(prev => ({ ...prev, [productId]: isNaN(quantity) ? 0 : Math.max(0, quantity) }));
   };
 
-  // Handler utama untuk mencatat penjualan dari tabel (dengan konfirmasi detail)
   const handleSaleSubmit = (e: FormEvent) => {
     e.preventDefault();
     const itemsToSell = Object.entries(saleQuantities)
       .map(([productId, quantity]) => ({ productId: parseInt(productId, 10), quantity }))
       .filter(item => item.quantity > 0);
-
     if (itemsToSell.length === 0) {
-      alert("Tidak ada produk yang dimasukkan untuk dijual. Harap isi kuantitas minimal pada satu produk.");
+      alert("Tidak ada produk untuk dijual.");
       return;
     }
 
     const componentDeductions: { [key: number]: number } = {};
     for (const item of itemsToSell) {
-      const recipe = productComponents.filter(pc => pc.product_id === item.productId);
-      for (const recipeItem of recipe) {
-        const totalNeeded = recipeItem.quantity_needed * item.quantity;
-        componentDeductions[recipeItem.component_id] = (componentDeductions[recipeItem.component_id] || 0) + totalNeeded;
+      // Filter resep untuk HANYA mendapatkan resep PENJUALAN (bahan pengemasan)
+      const saleRecipe = productComponents.filter(pc => 
+        pc.product_id === item.productId && pc.process_type === 'SALE'
+      );
+      
+      for (const recipeItem of saleRecipe) {
+        componentDeductions[recipeItem.component_id] = (componentDeductions[recipeItem.component_id] || 0) + (recipeItem.quantity_needed * item.quantity);
       }
     }
 
-    const stockImpactSummary = Object.entries(componentDeductions)
-      .map(([componentId, deduction]) => {
+    const stockImpactSummary = Object.entries(componentDeductions).map(([componentId, deduction]) => {
         const component = components.find(c => c.id === Number(componentId));
         if (!component) return null;
         const newStock = component.stock - deduction;
-        return `  - ${component.name}: ${component.stock} ${component.unit} -> ${newStock} ${component.unit}`;
-      })
-      .filter(line => line !== null)
-      .join('\n');
+        return `  - ${component.name}: ${component.stock} -> ${newStock}`;
+      }).filter(line => line).join('\n');
 
-    const saleSummary = itemsToSell
-      .map(item => {
+    const saleSummary = itemsToSell.map(item => {
         const product = products.find(p => p.id === item.productId);
-        return `${item.quantity}x ${product?.name || 'Produk tidak dikenal'}`;
-      })
-      .join('\n');
+        return `${item.quantity}x ${product?.name || '?'}`;
+      }).join('\n');
 
-    const confirmationMessage = `
-Anda yakin ingin mencatat penjualan untuk item berikut?
-
---- PRODUK TERJUAL ---
-${saleSummary}
-
---- DAMPAK PADA STOK KOMPONEN ---
-${stockImpactSummary.length > 0 ? stockImpactSummary : 'Tidak ada komponen yang terpengaruh.'}
-
-Aksi ini tidak dapat dibatalkan.
-    `;
-
-    const confirmed = window.confirm(confirmationMessage);
-    if (confirmed) {
-      const payload = { cart: itemsToSell };
-      invokeFunction('record-sale', payload, 'Penjualan berhasil dicatat!').then((success) => {
-        if (success) {
-          setSaleQuantities({});
-        }
+    const confirmationMessage = `Anda yakin ingin menjual:\n\n${saleSummary}\n\nIni akan mengubah stok bahan pengemasan:\n${stockImpactSummary || 'Tidak ada.'}\n\nLanjutkan?`;
+    
+    if (window.confirm(confirmationMessage)) {
+      invokeFunction('record-sale', { items: itemsToSell }, 'Penjualan berhasil dicatat!').then(success => {
+        if (success) setSaleQuantities({});
       });
     }
   };
@@ -286,21 +237,17 @@ Aksi ini tidak dapat dibatalkan.
   if (loading) return <div>Memuat data...</div>;
   if (error) return <div>Terjadi Kesalahan: {error}</div>;
 
-  // Tampilan JSX
   return (
     <div className="App">
       <h1>Inventaris Nooda</h1>
-
       <div className="section-container">
         <h2>Produk Jadi & Penjualan</h2>
         <table className="stock-table">
-          <thead><tr><th>Produk</th><th>SKU</th><th>Stok Tersedia</th></tr></thead>
+          <thead><tr><th>Produk</th><th>SKU</th><th>Stok</th></tr></thead>
           <tbody>
             {products.sort(sortProducts).map(p => (
               <tr key={p.id} className={getStockRowClass(p.stock, p.name)}>
-                <td>{p.name}</td>
-                <td>{p.sku}</td>
-                <td>{p.stock}</td>
+                <td>{p.name}</td><td>{p.sku}</td><td>{p.stock}</td>
               </tr>
             ))}
           </tbody>
@@ -309,7 +256,7 @@ Aksi ini tidak dapat dibatalkan.
           <h3>Catat Penjualan</h3>
           <form onSubmit={handleSaleSubmit}>
             <table className="sale-input-table">
-              <thead><tr><th>Produk</th><th>Jumlah Terjual</th></tr></thead>
+              <thead><tr><th>Produk</th><th>Jumlah</th></tr></thead>
               <tbody>
                 {products.sort(sortProducts).map(product => (
                   <tr key={product.id}>
@@ -319,11 +266,10 @@ Aksi ini tidak dapat dibatalkan.
                 ))}
               </tbody>
             </table>
-            <button type="submit" disabled={isSubmitting} className="submit-sale-btn">{isSubmitting ? 'Memproses...' : 'Catat Semua Penjualan'}</button>
+            <button type="submit" disabled={isSubmitting} className="submit-sale-btn">{isSubmitting ? 'Memproses...' : 'Catat Penjualan'}</button>
           </form>
         </div>
       </div>
-
       <div className="section-container">
         <h2>Bahan Baku & Produksi</h2>
         <table className="stock-table">
@@ -331,24 +277,10 @@ Aksi ini tidak dapat dibatalkan.
           <tbody>
             {components.map(c => (
               <tr key={c.id} className={getStockRowClass(c.stock, c.name)}>
-                <td>{c.name}</td>
-                <td>{c.stock}</td>
-                <td>{c.unit}</td>
+                <td>{c.name}</td><td>{c.stock}</td><td>{c.unit}</td>
                 <td className="action-cell">
-                  <button 
-                    className="modify-stock-btn subtract" 
-                    onClick={() => handleModifyComponentStock(c, 'subtract')} 
-                    disabled={isSubmitting || c.stock === 0}
-                  >
-                    -
-                  </button>
-                  <button 
-                    className="modify-stock-btn add" 
-                    onClick={() => handleModifyComponentStock(c, 'add')} 
-                    disabled={isSubmitting}
-                  >
-                    +
-                  </button>
+                  <button className="modify-stock-btn subtract" onClick={() => handleModifyComponentStock(c, 'subtract')} disabled={isSubmitting || c.stock === 0}>-</button>
+                  <button className="modify-stock-btn add" onClick={() => handleModifyComponentStock(c, 'add')} disabled={isSubmitting}>+</button>
                 </td>
               </tr>
             ))}
@@ -365,10 +297,27 @@ Aksi ini tidak dapat dibatalkan.
           </form>
         </div>
       </div>
-
-      <footer className="app-footer">
-        Aplikasi Inventaris Nooda | Versi: {APP_VERSION}
-      </footer>
+      <div className="section-container">
+        <h2>Log Aktivitas Terbaru</h2>
+        <div className="log-table-container">
+          <table className="stock-table">
+            <thead><tr><th style={{ width: '200px' }}>Waktu</th><th>Aksi</th></tr></thead>
+            <tbody>
+              {activityLogs.length > 0 ? (
+                activityLogs.map(log => (
+                  <tr key={log.id}>
+                    <td>{new Date(log.created_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}</td>
+                    <td style={{ whiteSpace: 'pre-wrap' }}>{log.description}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr><td colSpan={2}>Belum ada aktivitas.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <footer className="app-footer">Aplikasi Inventaris Nooda | Versi: {APP_VERSION}</footer>
     </div>
   );
 }

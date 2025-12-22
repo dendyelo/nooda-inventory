@@ -295,3 +295,10 @@ button:disabled {
   color: #888; /* Warna abu-abu agar tidak terlalu menonjol */
   border-top: 1px solid #eee; /* Garis pemisah tipis */
 }
+
+.log-table-container {
+  max-height: 400px; /* Batasi tinggi tabel log */
+  overflow-y: auto; /* Tambahkan scrollbar jika kontennya lebih panjang */
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}

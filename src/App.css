@@ -285,3 +285,13 @@ button:disabled {
 .stock-table tbody tr.stock-danger:hover {
   background-color: #f1c6cb;
 }
+
+/* Styling untuk App Footer dan Versi */
+.app-footer {
+  text-align: center;
+  margin-top: 40px; /* Memberi jarak dari elemen terakhir */
+  padding: 20px;
+  font-size: 0.85rem; /* Ukuran font sedikit lebih kecil */
+  color: #888; /* Warna abu-abu agar tidak terlalu menonjol */
+  border-top: 1px solid #eee; /* Garis pemisah tipis */
+}

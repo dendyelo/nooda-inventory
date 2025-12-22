@@ -1,4 +1,4 @@
-// File: src/App.tsx (v5.8 - Konfirmasi Produksi Detail)
+// File: src/App.tsx (v5.9 - Menambahkan Tampilan Versi)
 
 import { useState, useEffect, type FormEvent } from 'react';
 import { supabase } from './lib/supabaseClient';
@@ -15,6 +15,9 @@ type SaleQuantities = {
 };
 
 export default function App() {
+  // Konstanta Versi Aplikasi
+  const APP_VERSION = "v5.9";
+
   // States
   const [components, setComponents] = useState<Component[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -116,10 +119,7 @@ export default function App() {
     }
   };
 
-  // ========================================================================
-  // INI ADALAH BAGIAN YANG DIPERBARUI
-  // ========================================================================
-  // Handler untuk form produksi (DENGAN KONFIRMASI DETAIL)
+  // Handler untuk form produksi (dengan konfirmasi detail)
   const handleProductionSubmit = (e: FormEvent) => {
     e.preventDefault();
     const quantity = parseInt(prodQuantity, 10);
@@ -136,7 +136,6 @@ export default function App() {
       return;
     }
 
-    // --- Logika Kalkulasi Dampak Stok Produksi ---
     const recipe = productComponents.filter(pc => pc.product_id === productId);
     const stockImpactSummary = recipe
       .map(recipeItem => {
@@ -148,7 +147,6 @@ export default function App() {
       })
       .filter(line => line !== null)
       .join('\n');
-    // --- Akhir Logika Kalkulasi ---
 
     const confirmationMessage = `
 Anda akan menjalankan produksi untuk:
@@ -159,6 +157,8 @@ ${quantity}x ${product.name}
 
 --- KOMPONEN YANG DIGUNAKAN ---
 ${stockImpactSummary.length > 0 ? stockImpactSummary : 'Tidak ada komponen yang digunakan.'}
+
+Aksi ini tidak dapat dibatalkan.
     `;
 
     const confirmed = window.confirm(confirmationMessage);
@@ -169,11 +169,8 @@ ${stockImpactSummary.length > 0 ? stockImpactSummary : 'Tidak ada komponen yang 
         });
     }
   };
-  // ========================================================================
-  // AKHIR DARI BAGIAN YANG DIPERBARUI
-  // ========================================================================
 
-  // Fungsi untuk menambah/mengurangi stok bahan baku (Tidak diubah)
+  // Fungsi untuk menambah/mengurangi stok bahan baku
   const handleModifyComponentStock = async (component: Component, action: 'add' | 'subtract') => {
     const promptTitle = action === 'add' 
       ? `Masukkan jumlah stok yang ingin DITAMBAHKAN untuk:\n${component.name}`
@@ -214,7 +211,7 @@ ${stockImpactSummary.length > 0 ? stockImpactSummary : 'Tidak ada komponen yang 
     }
   };
 
-  // Handler untuk mengubah kuantitas di tabel penjualan (Tidak diubah)
+  // Handler untuk mengubah kuantitas di tabel penjualan
   const handleQuantityChange = (productId: number, quantityStr: string) => {
     if (quantityStr === '') {
       setSaleQuantities(prev => ({ ...prev, [productId]: 0 }));
@@ -225,7 +222,7 @@ ${stockImpactSummary.length > 0 ? stockImpactSummary : 'Tidak ada komponen yang 
     setSaleQuantities(prev => ({ ...prev, [productId]: newQuantity }));
   };
 
-  // Handler utama untuk mencatat penjualan dari tabel (Tidak diubah)
+  // Handler utama untuk mencatat penjualan dari tabel (dengan konfirmasi detail)
   const handleSaleSubmit = (e: FormEvent) => {
     e.preventDefault();
     const itemsToSell = Object.entries(saleQuantities)
@@ -271,6 +268,8 @@ ${saleSummary}
 
 --- DAMPAK PADA STOK KOMPONEN ---
 ${stockImpactSummary.length > 0 ? stockImpactSummary : 'Tidak ada komponen yang terpengaruh.'}
+
+Aksi ini tidak dapat dibatalkan.
     `;
 
     const confirmed = window.confirm(confirmationMessage);
@@ -287,7 +286,7 @@ ${stockImpactSummary.length > 0 ? stockImpactSummary : 'Tidak ada komponen yang 
   if (loading) return <div>Memuat data...</div>;
   if (error) return <div>Terjadi Kesalahan: {error}</div>;
 
-  // Tampilan JSX (Tidak diubah)
+  // Tampilan JSX
   return (
     <div className="App">
       <h1>Inventaris Nooda</h1>
@@ -366,6 +365,10 @@ ${stockImpactSummary.length > 0 ? stockImpactSummary : 'Tidak ada komponen yang 
           </form>
         </div>
       </div>
+
+      <footer className="app-footer">
+        Aplikasi Inventaris Nooda | Versi: {APP_VERSION}
+      </footer>
     </div>
   );
 }

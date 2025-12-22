@@ -1,4 +1,4 @@
-// File: src/App.tsx (v5.14 - Perbaikan Dialog Konfirmasi Penjualan)
+// File: src/App.tsx (v5.17 - Efek Sentuh Mobile Diperbaiki)
 
 import { useState, useEffect, type FormEvent } from 'react';
 import { supabase } from './lib/supabaseClient';
@@ -7,14 +7,13 @@ import './App.css';
 // Tipe Data
 type Product = { id: number; name: string; sku: string; stock: number; };
 type Component = { id: number; name: string; stock: number; unit: string; };
-// Menambahkan process_type ke tipe data agar TypeScript tahu
 type ProductComponent = { product_id: number; component_id: number; quantity_needed: number; process_type: 'PRODUCTION' | 'SALE'; };
 type ActivityLog = { id: number; created_at: string; description: string; };
 
 type SaleQuantities = { [productId: number]: number; };
 
 export default function App() {
-  const APP_VERSION = "v5.14";
+  const APP_VERSION = "v5.17";
 
   const [components, setComponents] = useState<Component[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -203,7 +202,6 @@ export default function App() {
 
     const componentDeductions: { [key: number]: number } = {};
     for (const item of itemsToSell) {
-      // Filter resep untuk HANYA mendapatkan resep PENJUALAN (bahan pengemasan)
       const saleRecipe = productComponents.filter(pc => 
         pc.product_id === item.productId && pc.process_type === 'SALE'
       );
@@ -240,14 +238,17 @@ export default function App() {
   return (
     <div className="App">
       <h1>Inventaris Nooda</h1>
+
       <div className="section-container">
         <h2>Produk Jadi & Penjualan</h2>
         <table className="stock-table">
           <thead><tr><th>Produk</th><th>SKU</th><th>Stok</th></tr></thead>
           <tbody>
             {products.sort(sortProducts).map(p => (
-              <tr key={p.id} className={getStockRowClass(p.stock, p.name)}>
-                <td>{p.name}</td><td>{p.sku}</td><td>{p.stock}</td>
+              <tr key={p.id} className={getStockRowClass(p.stock, p.name)} onTouchStart={() => {}}>
+                <td data-label="Produk">{p.name}</td>
+                <td data-label="SKU">{p.sku}</td>
+                <td data-label="Stok">{p.stock}</td>
               </tr>
             ))}
           </tbody>
@@ -255,13 +256,13 @@ export default function App() {
         <div className="form-panel sale-panel">
           <h3>Catat Penjualan</h3>
           <form onSubmit={handleSaleSubmit}>
-            <table className="sale-input-table">
+            <table className="sale-input-table stock-table">
               <thead><tr><th>Produk</th><th>Jumlah</th></tr></thead>
               <tbody>
                 {products.sort(sortProducts).map(product => (
-                  <tr key={product.id}>
-                    <td>{product.name}</td>
-                    <td><input type="number" min="0" value={saleQuantities[product.id] || ''} placeholder="0" onChange={(e) => handleQuantityChange(product.id, e.target.value)} className="quantity-input" /></td>
+                  <tr key={product.id} onTouchStart={() => {}}>
+                    <td data-label="Produk">{product.name}</td>
+                    <td data-label="Jumlah"><input type="number" min="0" value={saleQuantities[product.id] || ''} placeholder="0" onChange={(e) => handleQuantityChange(product.id, e.target.value)} className="quantity-input" /></td>
                   </tr>
                 ))}
               </tbody>
@@ -270,15 +271,18 @@ export default function App() {
           </form>
         </div>
       </div>
+
       <div className="section-container">
-        <h2>Bahan Baku & Produksi</h2>
+        <h2>Bahan Baku</h2>
         <table className="stock-table">
           <thead><tr><th>Komponen</th><th>Stok</th><th>Satuan</th><th>Aksi</th></tr></thead>
           <tbody>
             {components.map(c => (
-              <tr key={c.id} className={getStockRowClass(c.stock, c.name)}>
-                <td>{c.name}</td><td>{c.stock}</td><td>{c.unit}</td>
-                <td className="action-cell">
+              <tr key={c.id} className={getStockRowClass(c.stock, c.name)} onTouchStart={() => {}}>
+                <td data-label="Komponen">{c.name}</td>
+                <td data-label="Stok">{c.stock}</td>
+                <td data-label="Satuan">{c.unit}</td>
+                <td className="action-cell" data-label="Aksi">
                   <button className="modify-stock-btn subtract" onClick={() => handleModifyComponentStock(c, 'subtract')} disabled={isSubmitting || c.stock === 0}>-</button>
                   <button className="modify-stock-btn add" onClick={() => handleModifyComponentStock(c, 'add')} disabled={isSubmitting}>+</button>
                 </td>
@@ -286,8 +290,11 @@ export default function App() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="section-container">
+        <h2>Jalankan Produksi</h2>
         <div className="form-panel production-panel">
-          <h3>Jalankan Produksi</h3>
           <form onSubmit={handleProductionSubmit}>
             <select value={prodProductId} onChange={(e) => setProdProductId(e.target.value)}>
               {products.sort(sortProducts).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -297,6 +304,7 @@ export default function App() {
           </form>
         </div>
       </div>
+
       <div className="section-container">
         <h2>Log Aktivitas Terbaru</h2>
         <div className="log-table-container">
@@ -305,9 +313,9 @@ export default function App() {
             <tbody>
               {activityLogs.length > 0 ? (
                 activityLogs.map(log => (
-                  <tr key={log.id}>
-                    <td>{new Date(log.created_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}</td>
-                    <td style={{ whiteSpace: 'pre-wrap' }}>{log.description}</td>
+                  <tr key={log.id} onTouchStart={() => {}}>
+                    <td data-label="Waktu">{new Date(log.created_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}</td>
+                    <td data-label="Aksi" style={{ whiteSpace: 'pre-wrap' }}>{log.description}</td>
                   </tr>
                 ))
               ) : (
@@ -317,6 +325,7 @@ export default function App() {
           </table>
         </div>
       </div>
+
       <footer className="app-footer">Aplikasi Inventaris Nooda | Versi: {APP_VERSION}</footer>
     </div>
   );

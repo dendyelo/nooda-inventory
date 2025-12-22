@@ -1,304 +1,269 @@
-/* ================================================== */
-/*        Gaya CSS Lengkap untuk Nooda Inventory      */
-/* ================================================== */
-
-/* Variabel Warna dan Gaya Dasar */
+/* ======================================================================== */
+/*      GAYA DASAR (TEMA TERANG)                                            */
+/* ======================================================================== */
 :root {
-  --primary-color: #007bff;
-  --primary-hover: #0056b3;
-  --success-color: #28a745;
-  --success-hover: #218838;
-  --warning-color: #ffc107;
-  --warning-hover: #e0a800;
-  --danger-color: #dc3545;
-  --danger-hover: #c82333;
-  --danger-light: #f8d7da;
-  --danger-dark: #721c24;
-  --background-color: #f8f9fa;
-  --text-color: #212529;
-  --border-color: #dee2e6;
-  --panel-bg: #ffffff;
-  --shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-}
-
-/* Pengaturan Global untuk Body */
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: light;
+  color: #213547;
+  background-color: #ffffff;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: var(--background-color);
-  color: var(--text-color);
 }
 
-/* Kontainer Utama Aplikasi */
-.App {
+body {
+  margin: 0;
+  display: flex;
+  place-items: center;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+h1 {
+  font-size: 2.5em;
+  line-height: 1.1;
   text-align: center;
-  padding: 24px;
+  margin-bottom: 2rem;
+}
+
+h2 {
+  border-bottom: 2px solid #e0e0e0;
+  padding-bottom: 0.5rem;
+  margin-top: 0;
+}
+
+h3 {
+  margin-top: 0;
+}
+
+button {
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  background-color: #f9f9f9;
+  cursor: pointer;
+  transition: border-color 0.25s, background-color 0.25s;
+}
+button:hover {
+  border-color: #646cff;
+}
+button:focus,
+button:focus-visible {
+  outline: 4px auto -webkit-focus-ring-color;
+}
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* ======================================================================== */
+/*      TATA LETAK UTAMA (VERTIKAL)                                         */
+/* ======================================================================== */
+.App {
+  width: 100%;
   max-width: 1200px;
   margin: 0 auto;
-}
-
-.App h1 {
-  color: var(--primary-color);
-  font-size: 2.5rem;
-  margin-bottom: 24px;
-}
-
-/* Kontainer untuk setiap bagian besar (Produk Jadi & Bahan Baku) */
-.section-container {
-  background-color: var(--panel-bg);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  padding: 24px;
-  margin-top: 40px;
-  box-shadow: var(--shadow);
+  padding: 2rem;
   text-align: left;
 }
 
-.section-container h2 {
-  font-size: 1.75rem;
-  color: #495057;
-  margin-top: 0;
-  margin-bottom: 24px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--border-color);
+.section-container {
+  background-color: #f9f9f9;
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 2rem;
+  border: 1px solid #e0e0e0;
 }
 
-/* Gaya Tabel Stok Utama */
+/* ======================================================================== */
+/*      GAYA TABEL (EFEK HOVER & SENTUH TAJAM)                              */
+/* ======================================================================== */
 .stock-table {
   width: 100%;
   border-collapse: collapse;
+  margin-bottom: 1.5rem;
 }
 
-.stock-table th,
-.stock-table td {
-  padding: 16px;
+.stock-table th, .stock-table td {
+  border: 1px solid #ddd;
+  padding: 0.75rem;
   text-align: left;
-  border-bottom: 1px solid var(--border-color);
-  vertical-align: middle;
+  transition: background-color 0.15s ease-in-out;
 }
 
 .stock-table th {
-  background-color: #f8f9fa;
-  font-weight: 600;
-  text-transform: uppercase;
-  font-size: 0.85em;
-  letter-spacing: 0.5px;
+  background-color: #f2f2f2;
 }
 
-.stock-table tbody tr:hover {
-  background-color: #f1f3f5;
+.stock-table tbody tr:not(.stock-warning):not(.stock-danger):hover,
+.stock-table tbody tr:not(.stock-warning):not(.stock-danger):active {
+    background-color: #e9e9e9;
 }
 
-.stock-table tbody tr:last-child td {
-  border-bottom: none;
+.stock-warning {
+  background-color: #fff3cd;
+}
+.stock-warning:hover,
+.stock-warning:active {
+  background-color: #ffe69c;
 }
 
-/* Panel Aksi (Form) */
+.stock-danger {
+  background-color: #ffdddd;
+}
+.stock-danger:hover,
+.stock-danger:active {
+  background-color: #ffb8b8;
+}
+
+/* ======================================================================== */
+/*      GAYA FORM & TOMBOL                                                  */
+/* ======================================================================== */
 .form-panel {
-  border: 2px dashed var(--border-color);
-  padding: 24px;
+  background-color: #fff;
+  padding: 1rem;
   border-radius: 8px;
-  margin-top: 32px;
-  background-color: #fdfdff;
+  margin-top: 1rem;
+  border: 1px solid #e0e0e0;
 }
-
-.form-panel h3 {
-  margin-top: 0;
-  font-size: 1.5rem;
-}
-
 .form-panel form {
   display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-/* Gaya untuk Form Produksi */
-.production-panel form {
-  flex-direction: row;
   align-items: center;
+  gap: 10px;
   flex-wrap: wrap;
 }
-
-.production-panel select,
-.production-panel input {
-  flex-grow: 1;
-  padding: 12px;
-  font-size: 1rem;
+.form-panel input, .form-panel select {
+  padding: 0.6em;
   border-radius: 6px;
-  border: 1px solid var(--border-color);
+  border: 1px solid #ccc;
+  background-color: #fff;
+  color: #213547;
 }
-
-.production-panel button {
-  padding: 12px 24px;
-  font-size: 1rem;
-  border-radius: 6px;
-  background-color: var(--primary-color);
-  color: white;
-  border: none;
-  cursor: pointer;
-  font-weight: 600;
-  transition: background-color 0.2s ease-in-out;
-}
-
-.production-panel button:hover:not(:disabled) {
-  background-color: var(--primary-hover);
-}
-
-/* Gaya untuk Form Penjualan (Tabel Input) */
 .sale-input-table {
   width: 100%;
   border-collapse: collapse;
 }
-
-.sale-input-table th, .sale-input-table td {
-  padding: 12px 8px;
-  text-align: left;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.sale-input-table th {
-  font-weight: 600;
-}
-
-.sale-input-table td:last-child {
-  text-align: right;
-}
-
 .quantity-input {
   width: 80px;
-  padding: 8px;
-  text-align: center;
-  font-size: 1rem;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
 }
 
-.quantity-input:focus {
-  outline: none;
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
-}
-
-/* Tombol Submit Penjualan */
 .submit-sale-btn {
   width: 100%;
-  padding: 12px;
-  font-size: 1.1rem;
-  border-radius: 6px;
-  background-color: var(--success-color);
+  padding: 1em;
+  margin-top: 1rem;
+  background-color: #28a745;
   color: white;
   border: none;
-  cursor: pointer;
-  font-weight: 600;
-  margin-top: 16px;
+}
+.submit-sale-btn:hover {
+  background-color: #218838;
+  border-color: #1e7e34;
 }
 
-.submit-sale-btn:hover:not(:disabled) {
-  background-color: var(--success-hover);
+.production-panel button[type="submit"] {
+  background-color: #007bff;
+  color: white;
+  border: none;
+}
+.production-panel button[type="submit"]:hover {
+  background-color: #0069d9;
+  border-color: #0062cc;
 }
 
-/* =================================================================
-   GAYA BARU UNTUK TOMBOL AKSI TAMBAH/KURANG STOK (v4 - Profesional Biru & Abu-abu)
-   ================================================================= */
 .action-cell {
   display: flex;
-  gap: 8px;
-  align-items: center;
+  gap: 5px;
+  justify-content: center;
 }
 
 .modify-stock-btn {
+  padding: 0.3em 0.8em;
+  font-size: 1.2em;
+  line-height: 1;
   border: none;
-  border-radius: 6px;
-  padding: 8px 14px;
-  font-size: 1.1rem;
-  font-weight: bold;
-  color: white; /* Warna teks putih untuk kontras terbaik */
-  cursor: pointer;
-  transition: all 0.2s ease-in-out;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1); /* Bayangan halus */
+  color: white;
 }
-
-.modify-stock-btn:hover:not(:disabled) {
-  transform: translateY(-2px); /* Efek terangkat saat hover */
-  box-shadow: 0 4px 8px rgba(0,0,0,0.15); /* Bayangan lebih jelas saat hover */
-}
-
-.modify-stock-btn:active:not(:disabled) {
-  transform: translateY(0);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-}
-
-/* Tombol Tambah (+) - Warna Biru Primer */
 .modify-stock-btn.add {
-  background-color: var(--primary-color); /* Menggunakan variabel --primary-color */
+  background-color: #007bff;
 }
-.modify-stock-btn.add:hover:not(:disabled) {
-  background-color: var(--primary-hover); /* Versi hover yang lebih gelap */
+.modify-stock-btn.add:hover {
+  background-color: #0069d9;
 }
-
-/* Tombol Kurang (-) - Warna Abu-abu Netral */
 .modify-stock-btn.subtract {
-  background-color: #6c757d; /* Warna abu-abu standar yang bagus */
+  background-color: #6c757d;
 }
-.modify-stock-btn.subtract:hover:not(:disabled) {
-  background-color: #5a6268; /* Versi hover yang lebih gelap */
-}
-
-
-/* Status Tombol Disabled */
-button:disabled {
-  background-color: #e9ecef !important;
-  border-color: #dee2e6 !important;
-  color: #6c757d !important;
-  cursor: not-allowed !important;
-  box-shadow: none !important;
-  transform: none !important;
-}
-
-/* =================================================================
-   GAYA UNTUK HIGHLIGHT STOK (VERSI SPESIFIK)
-   ================================================================= */
-
-/* Kelas untuk stok kritis (mendekati habis) */
-.stock-table tbody tr.stock-warning {
-  background-color: #fff3cd;
-  font-weight: bold;
-}
-
-/* Kelas untuk stok habis */
-.stock-table tbody tr.stock-danger {
-  background-color: #f8d7da;
-  font-weight: bold;
-  color: var(--danger-dark);
-}
-
-/* Pastikan warna highlight tetap terlihat saat di-hover */
-.stock-table tbody tr.stock-warning:hover {
-  background-color: #ffe8a1;
-}
-
-.stock-table tbody tr.stock-danger:hover {
-  background-color: #f1c6cb;
-}
-
-/* Styling untuk App Footer dan Versi */
-.app-footer {
-  text-align: center;
-  margin-top: 40px; /* Memberi jarak dari elemen terakhir */
-  padding: 20px;
-  font-size: 0.85rem; /* Ukuran font sedikit lebih kecil */
-  color: #888; /* Warna abu-abu agar tidak terlalu menonjol */
-  border-top: 1px solid #eee; /* Garis pemisah tipis */
+.modify-stock-btn.subtract:hover {
+  background-color: #5a6268;
 }
 
 .log-table-container {
-  max-height: 400px; /* Batasi tinggi tabel log */
-  overflow-y: auto; /* Tambahkan scrollbar jika kontennya lebih panjang */
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+.app-footer {
+  width: 100%;
+  text-align: center;
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e0e0e0;
+  color: #aaa;
+}
+
+/* ======================================================================== */
+/*      GAYA RESPONSIVE (HANYA UNTUK MOBILE)                                */
+/* ======================================================================== */
+
+@media screen and (max-width: 768px) {
+  
+  .App {
+    padding: 1rem;
+  }
+
+  /* Aturan yang salah sebelumnya telah dihapus dari sini untuk memperbaiki efek sentuh */
+
+  /* --- Transformasi Tabel menjadi Kartu --- */
+  .stock-table thead {
+    display: none;
+  }
+  .stock-table tr {
+    display: block;
+    margin-bottom: 1rem;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 1rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  }
+  .stock-table td {
+    display: block;
+    text-align: right;
+    position: relative;
+    padding-left: 50%;
+    border-bottom: 1px solid #eee;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+  .stock-table td:last-child {
+    border-bottom: none;
+  }
+  .stock-table td::before {
+    content: attr(data-label);
+    position: absolute;
+    left: 10px;
+    font-weight: bold;
+    text-align: left;
+    white-space: nowrap;
+  }
+  .action-cell {
+    padding-left: 0;
+    text-align: center;
+  }
+  .action-cell::before {
+    display: none;
+  }
 }

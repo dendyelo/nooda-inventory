@@ -1,4 +1,4 @@
-// File: src/App.tsx (v5.6 - Final dengan Aksi Tambah/Kurang Stok)
+// File: src/App.tsx (v5.8 - Konfirmasi Produksi Detail)
 
 import { useState, useEffect, type FormEvent } from 'react';
 import { supabase } from './lib/supabaseClient';
@@ -7,6 +7,7 @@ import './App.css';
 // Tipe Data
 type Product = { id: number; name: string; sku: string; stock: number; };
 type Component = { id: number; name: string; stock: number; unit: string; };
+type ProductComponent = { product_id: number; component_id: number; quantity_needed: number; };
 
 // Tipe data untuk state kuantitas penjualan
 type SaleQuantities = {
@@ -17,6 +18,7 @@ export default function App() {
   // States
   const [components, setComponents] = useState<Component[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [productComponents, setProductComponents] = useState<ProductComponent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -54,14 +56,19 @@ export default function App() {
   // Fungsi untuk mengambil semua data dari Supabase
   const fetchData = async () => {
     try {
-      const [compRes, prodRes] = await Promise.all([
+      const [compRes, prodRes, pcRes] = await Promise.all([
         supabase.from('components').select('*').order('name'),
-        supabase.from('products').select('*')
+        supabase.from('products').select('*'),
+        supabase.from('product_components').select('*')
       ]);
       if (compRes.error) throw compRes.error;
       if (prodRes.error) throw prodRes.error;
+      if (pcRes.error) throw pcRes.error;
+
       setComponents(compRes.data || []);
       setProducts(prodRes.data || []);
+      setProductComponents(pcRes.data || []);
+
       if (prodRes.data && prodRes.data.length > 0) {
         const sortedProducts = [...prodRes.data].sort(sortProducts);
         if (!prodProductId) setProdProductId(sortedProducts[0].id.toString());
@@ -109,24 +116,64 @@ export default function App() {
     }
   };
 
-  // Handler untuk form produksi
+  // ========================================================================
+  // INI ADALAH BAGIAN YANG DIPERBARUI
+  // ========================================================================
+  // Handler untuk form produksi (DENGAN KONFIRMASI DETAIL)
   const handleProductionSubmit = (e: FormEvent) => {
     e.preventDefault();
     const quantity = parseInt(prodQuantity, 10);
-    if (isNaN(quantity) || quantity <= 0) {
-      alert("Harap masukkan jumlah produksi yang valid (lebih dari 0).");
+    const productId = parseInt(prodProductId, 10);
+
+    if (isNaN(productId) || isNaN(quantity) || quantity <= 0) {
+      alert("Harap pilih produk dan masukkan jumlah produksi yang valid (lebih dari 0).");
       return;
     }
-    const confirmed = window.confirm(`Anda yakin ingin memproduksi ${quantity} unit?`);
+
+    const product = products.find(p => p.id === productId);
+    if (!product) {
+      alert("Produk yang dipilih tidak ditemukan.");
+      return;
+    }
+
+    // --- Logika Kalkulasi Dampak Stok Produksi ---
+    const recipe = productComponents.filter(pc => pc.product_id === productId);
+    const stockImpactSummary = recipe
+      .map(recipeItem => {
+        const component = components.find(c => c.id === recipeItem.component_id);
+        if (!component) return null;
+        const totalNeeded = recipeItem.quantity_needed * quantity;
+        const newStock = component.stock - totalNeeded;
+        return `  - ${component.name}: ${component.stock} ${component.unit} -> ${newStock} ${component.unit}`;
+      })
+      .filter(line => line !== null)
+      .join('\n');
+    // --- Akhir Logika Kalkulasi ---
+
+    const confirmationMessage = `
+Anda akan menjalankan produksi untuk:
+
+--- PRODUK DIBUAT ---
+${quantity}x ${product.name}
+(Stok akan berubah dari ${product.stock} -> ${product.stock + quantity})
+
+--- KOMPONEN YANG DIGUNAKAN ---
+${stockImpactSummary.length > 0 ? stockImpactSummary : 'Tidak ada komponen yang digunakan.'}
+    `;
+
+    const confirmed = window.confirm(confirmationMessage);
     if (confirmed) {
-      invokeFunction('produce-dcp', { productId: parseInt(prodProductId), quantity }, 'Produksi berhasil diselesaikan!')
+      invokeFunction('produce-dcp', { productId, quantity }, 'Produksi berhasil diselesaikan!')
         .then(success => {
           if (success) setProdQuantity('');
         });
     }
   };
+  // ========================================================================
+  // AKHIR DARI BAGIAN YANG DIPERBARUI
+  // ========================================================================
 
-  // Fungsi baru untuk menambah DAN mengurangi stok bahan baku
+  // Fungsi untuk menambah/mengurangi stok bahan baku (Tidak diubah)
   const handleModifyComponentStock = async (component: Component, action: 'add' | 'subtract') => {
     const promptTitle = action === 'add' 
       ? `Masukkan jumlah stok yang ingin DITAMBAHKAN untuk:\n${component.name}`
@@ -167,7 +214,7 @@ export default function App() {
     }
   };
 
-  // Handler untuk mengubah kuantitas di tabel penjualan
+  // Handler untuk mengubah kuantitas di tabel penjualan (Tidak diubah)
   const handleQuantityChange = (productId: number, quantityStr: string) => {
     if (quantityStr === '') {
       setSaleQuantities(prev => ({ ...prev, [productId]: 0 }));
@@ -178,25 +225,69 @@ export default function App() {
     setSaleQuantities(prev => ({ ...prev, [productId]: newQuantity }));
   };
 
-  // Handler utama untuk mencatat penjualan dari tabel
+  // Handler utama untuk mencatat penjualan dari tabel (Tidak diubah)
   const handleSaleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    const itemsToSell = Object.entries(saleQuantities).map(([productId, quantity]) => ({ productId: parseInt(productId, 10), quantity, })).filter(item => item.quantity > 0);
+    const itemsToSell = Object.entries(saleQuantities)
+      .map(([productId, quantity]) => ({ productId: parseInt(productId, 10), quantity }))
+      .filter(item => item.quantity > 0);
+
     if (itemsToSell.length === 0) {
       alert("Tidak ada produk yang dimasukkan untuk dijual. Harap isi kuantitas minimal pada satu produk.");
       return;
     }
-    const summary = itemsToSell.map(item => { const product = products.find(p => p.id === item.productId); return `${item.quantity}x ${product?.name || 'Produk tidak dikenal'}`; }).join('\n');
-    const confirmed = window.confirm(`Anda yakin ingin mencatat penjualan untuk item berikut?\n\n${summary}`);
+
+    const componentDeductions: { [key: number]: number } = {};
+    for (const item of itemsToSell) {
+      const recipe = productComponents.filter(pc => pc.product_id === item.productId);
+      for (const recipeItem of recipe) {
+        const totalNeeded = recipeItem.quantity_needed * item.quantity;
+        componentDeductions[recipeItem.component_id] = (componentDeductions[recipeItem.component_id] || 0) + totalNeeded;
+      }
+    }
+
+    const stockImpactSummary = Object.entries(componentDeductions)
+      .map(([componentId, deduction]) => {
+        const component = components.find(c => c.id === Number(componentId));
+        if (!component) return null;
+        const newStock = component.stock - deduction;
+        return `  - ${component.name}: ${component.stock} ${component.unit} -> ${newStock} ${component.unit}`;
+      })
+      .filter(line => line !== null)
+      .join('\n');
+
+    const saleSummary = itemsToSell
+      .map(item => {
+        const product = products.find(p => p.id === item.productId);
+        return `${item.quantity}x ${product?.name || 'Produk tidak dikenal'}`;
+      })
+      .join('\n');
+
+    const confirmationMessage = `
+Anda yakin ingin mencatat penjualan untuk item berikut?
+
+--- PRODUK TERJUAL ---
+${saleSummary}
+
+--- DAMPAK PADA STOK KOMPONEN ---
+${stockImpactSummary.length > 0 ? stockImpactSummary : 'Tidak ada komponen yang terpengaruh.'}
+    `;
+
+    const confirmed = window.confirm(confirmationMessage);
     if (confirmed) {
       const payload = { cart: itemsToSell };
-      invokeFunction('record-sale', payload, 'Penjualan berhasil dicatat!').then((success) => { if (success) { setSaleQuantities({}); } });
+      invokeFunction('record-sale', payload, 'Penjualan berhasil dicatat!').then((success) => {
+        if (success) {
+          setSaleQuantities({});
+        }
+      });
     }
   };
 
   if (loading) return <div>Memuat data...</div>;
   if (error) return <div>Terjadi Kesalahan: {error}</div>;
 
+  // Tampilan JSX (Tidak diubah)
   return (
     <div className="App">
       <h1>Inventaris Nooda</h1>

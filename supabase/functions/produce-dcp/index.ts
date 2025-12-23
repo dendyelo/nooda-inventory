@@ -1,15 +1,27 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+// File: supabase/functions/produce-dcp/index.ts (Versi 4.4 - Dengan User Logging)
+
+import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 
-console.log("Initializing produce-dcp function v4.3 (NaN Bugfix )");
-
-// Fungsi Pembantu untuk mengambil detail komponen.
-async function getComponentDetails(supabase: any, name: string): Promise<{ id: number; stock: number; unit: string; }> {
-  const { data, error } = await supabase.from('components').select('id, stock, unit').eq('name', name).single();
-  if (error || !data) {
-    throw new Error(`Komponen penting '${name}' tidak ditemukan di database.`);
+// Fungsi helper untuk mendapatkan info pengguna dari token otentikasi
+// (Ini bisa dipindahkan ke file _shared jika Anda mau, tapi di sini juga tidak apa-apa )
+async function getUserInfo(supabaseClient: SupabaseClient) {
+  const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+  if (userError || !user) {
+    throw new Error("Pengguna tidak terotentikasi. Silakan login kembali.");
   }
-  return data;
+  
+  const { data: profile, error: profileError } = await supabaseClient
+    .from('profiles')
+    .select('username')
+    .eq('id', user.id)
+    .single();
+    
+  if (profileError || !profile) {
+    throw new Error(`Profil untuk pengguna dengan ID ${user.id} tidak ditemukan.`);
+  }
+  
+  return { userId: user.id, username: profile.username };
 }
 
 Deno.serve(async (req) => {
@@ -19,102 +31,109 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // 1. Validasi data masuk
-    const { productId, quantity } = await req.json();
-    if (!productId || !quantity || quantity <= 0) {
-      throw new Error("ID Produk dan jumlah (lebih dari 0) harus disertakan.");
-    }
-
-    // 2. Buat Supabase client
+    // Buat Supabase client dengan menyertakan token otentikasi dari request
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_ANON_KEY')!,
       { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     );
 
-    // 3. Ambil data produk, termasuk stok awal untuk logging
-    const { data: product, error: productError } = await supabaseClient.from('products').select('sku, name, stock').eq('id', productId).single();
+    // Panggil fungsi helper untuk mendapatkan info pengguna di awal
+    const { userId, username } = await getUserInfo(supabaseClient);
+
+    // Ambil data produksi dari body request
+    const { productId, quantity } = await req.json();
+    if (!productId || !quantity || quantity <= 0) {
+      throw new Error("ID Produk dan jumlah produksi harus valid.");
+    }
+
+    // Ambil data produk yang akan diproduksi
+    const { data: product, error: productError } = await supabaseClient
+      .from('products')
+      .select('id, name, sku, stock')
+      .eq('id', productId)
+      .single();
+
     if (productError || !product) {
       throw new Error(`Produk dengan ID ${productId} tidak ditemukan.`);
     }
-    const initialProductStock = product.stock;
 
-    // 4. Bangun daftar komponen yang akan dikurangi, dengan data stok awal yang benar
-    let componentsToDecrement: { id: number; name: string; initialStock: number; unit: string; quantityToDeduct: number; }[] = [];
-
+    // Tentukan resep berdasarkan SKU produk (logika hardcoded)
+    let componentsNeeded: { name: string; quantity: number }[] = [];
     if (product.sku === 'DCP-MINI') {
-      const details = await getComponentDetails(supabaseClient, 'Botol Mini');
-      // Secara eksplisit petakan 'stock' dari 'details' ke 'initialStock'
-      componentsToDecrement.push({ id: details.id, name: 'Botol Mini', initialStock: details.stock, unit: details.unit, quantityToDeduct: 1 * quantity });
+      componentsNeeded = [{ name: 'Botol Mini', quantity: 1 }];
     } else if (product.sku === 'DCP-CORE') {
-      const details = await getComponentDetails(supabaseClient, 'Botol Core');
-      // Secara eksplisit petakan 'stock' dari 'details' ke 'initialStock'
-      componentsToDecrement.push({ id: details.id, name: 'Botol Core', initialStock: details.stock, unit: details.unit, quantityToDeduct: 1 * quantity });
+      componentsNeeded = [{ name: 'Botol Core', quantity: 1 }];
     } else if (product.sku === 'DCP-PRO') {
-      const botolDetails = await getComponentDetails(supabaseClient, 'Botol Pro');
-      const sealDetails = await getComponentDetails(supabaseClient, 'Seal Pro');
-      const sprayerDetails = await getComponentDetails(supabaseClient, 'Sprayer Pro');
-      const tutupDetails = await getComponentDetails(supabaseClient, 'Tutup Botol Pro');
-      componentsToDecrement.push(
-        // Secara eksplisit petakan 'stock' dari setiap 'details' ke 'initialStock'
-        { id: botolDetails.id, name: 'Botol Pro', initialStock: botolDetails.stock, unit: botolDetails.unit, quantityToDeduct: 1 * quantity },
-        { id: sealDetails.id, name: 'Seal Pro', initialStock: sealDetails.stock, unit: sealDetails.unit, quantityToDeduct: 1 * quantity },
-        { id: sprayerDetails.id, name: 'Sprayer Pro', initialStock: sprayerDetails.stock, unit: sprayerDetails.unit, quantityToDeduct: 1 * quantity },
-        { id: tutupDetails.id, name: 'Tutup Botol Pro', initialStock: tutupDetails.stock, unit: tutupDetails.unit, quantityToDeduct: 1 * quantity }
-      );
+      componentsNeeded = [
+        { name: 'Botol Pro', quantity: 1 },
+        { name: 'Seal Pro', quantity: 1 },
+        { name: 'Sprayer Pro', quantity: 1 },
+        { name: 'Tutup Botol Pro', quantity: 1 },
+      ];
     } else {
-      throw new Error(`Logika produksi untuk produk SKU '${product.sku}' tidak didefinisikan.`);
+      throw new Error(`Tidak ada resep produksi yang ditemukan untuk produk SKU: ${product.sku}`);
     }
 
-    // 5. Validasi stok (sekarang akan berfungsi karena `initialStock` ada nilainya)
-    for (const comp of componentsToDecrement) {
-      if (comp.initialStock < comp.quantityToDeduct) {
-        throw new Error(`Stok tidak cukup untuk komponen '${comp.name}'. Dibutuhkan: ${comp.quantityToDeduct}, Tersedia: ${comp.initialStock}`);
+    // Ambil data stok komponen yang relevan
+    const componentNames = componentsNeeded.map(c => c.name);
+    const { data: componentsData, error: componentsError } = await supabaseClient
+      .from('components')
+      .select('id, name, stock')
+      .in('name', componentNames);
+
+    if (componentsError) throw new Error("Gagal mengambil data komponen.");
+
+    // Kumpulkan semua perubahan stok untuk log yang detail
+    const stockImpacts: { name: string; initialStock: number; finalStock: number; type: 'PRODUCT' | 'COMPONENT' }[] = [];
+
+    // 1. Validasi dan kurangi stok KOMPONEN MENTAH
+    for (const recipeItem of componentsNeeded) {
+      const component = componentsData.find(c => c.name === recipeItem.name);
+      const totalNeeded = recipeItem.quantity * quantity;
+
+      if (!component) throw new Error(`Komponen ${recipeItem.name} tidak ditemukan di database.`);
+      if (component.stock < totalNeeded) {
+        throw new Error(`Stok untuk ${component.name} tidak mencukupi (tersisa ${component.stock}, dibutuhkan ${totalNeeded}).`);
       }
-    }
 
-    // 6. Lakukan pengurangan stok komponen
-    for (const comp of componentsToDecrement) {
-      const { error: decrementError } = await supabaseClient.rpc('decrement_component_stock', {
-        p_component_id: comp.id,
-        p_quantity_to_deduct: comp.quantityToDeduct
+      const newStock = component.stock - totalNeeded;
+      const { error: updateError } = await supabaseClient.rpc('decrement_component_stock', {
+        p_component_id: component.id,
+        p_quantity_to_deduct: totalNeeded
       });
-      if (decrementError) throw decrementError;
+      if (updateError) throw updateError;
+
+      stockImpacts.push({ name: component.name, initialStock: component.stock, finalStock: newStock, type: 'COMPONENT' });
     }
 
-    // 7. Lakukan penambahan stok produk jadi
+    // 2. Tambah stok PRODUK JADI
+    const newProductStock = product.stock + quantity;
     const { error: incrementError } = await supabaseClient.rpc('increment_product_stock', {
-      p_id: productId,
-      p_quantity: quantity
+      p_product_id: product.id,
+      p_quantity_to_add: quantity
     });
     if (incrementError) throw incrementError;
 
-    // 8. Buat deskripsi log yang sangat detail
-    let description = `Produksi ${quantity}x ${product.name} selesai.\nDampak stok:\n`;
-    description += `  - ${product.name} (Produk Jadi): ${initialProductStock} -> ${initialProductStock + quantity}\n`;
-    for (const comp of componentsToDecrement) {
-      description += `  - ${comp.name}: ${comp.initialStock} -> ${comp.initialStock - comp.quantityToDeduct} ${comp.unit}\n`;
-    }
+    stockImpacts.push({ name: product.name, initialStock: product.stock, finalStock: newProductStock, type: 'PRODUCT' });
 
-    // 9. Sisipkan log ke database
+    // Buat deskripsi log yang detail
+    const stockSummary = stockImpacts.map(si => 
+      `  - ${si.name}: ${si.initialStock} -> ${si.finalStock}`
+    ).join('\n');
+
+    const description = `Produksi ${quantity}x ${product.name}.\n\nDampak Stok:\n${stockSummary}`;
+
+    // Sisipkan log ke tabel activity_logs dengan menyertakan info pengguna
     await supabaseClient.from('activity_logs').insert({
       action_type: 'PRODUCTION_RUN',
       description: description,
-      details: {
-        product_id: productId,
-        quantity_produced: quantity,
-        initial_product_stock: initialProductStock,
-        final_product_stock: initialProductStock + quantity,
-        components_impact: componentsToDecrement.map(c => ({
-          name: c.name,
-          initial_stock: c.initialStock,
-          final_stock: c.initialStock - c.quantityToDeduct,
-          unit: c.unit
-        }))
-      }
+      details: { product_id: productId, quantity_produced: quantity, stock_impact: stockImpacts },
+      user_id: userId,     // <-- DATA BARU
+      username: username   // <-- DATA BARU
     });
 
-    // 10. Kirim respons sukses
+    // Kirim respons sukses
     return new Response(JSON.stringify({ message: 'Produksi berhasil diselesaikan!' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,

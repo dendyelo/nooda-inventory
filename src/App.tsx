@@ -339,7 +339,7 @@ export default function App({ user }: AppProps) {
       <div className="section-container">
         <h2>Log Aktivitas Terbaru</h2>
         <div className="table-wrapper">
-          <table className="stock-table">
+          <table className="stock-table log-table">
             <thead>
               <tr>
                 <th style={{ width: '200px' }}>Waktu</th>
@@ -351,9 +351,9 @@ export default function App({ user }: AppProps) {
               {activityLogs.length > 0 ? (
                 activityLogs.map(log => (
                   <tr key={log.id}>
-                    <td>{new Date(log.created_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}</td>
-                    <td style={{ whiteSpace: 'pre-wrap' }}>{log.description}</td>
-                    <td>{log.username || 'Sistem'}</td>
+                    <td data-label="Waktu">{new Date(log.created_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}</td>
+                    <td data-label="Aksi" style={{ whiteSpace: 'pre-wrap' }}>{log.description}</td>
+                    <td data-label="Pengguna">{log.username || 'Sistem'}</td>
                   </tr>
                 ))
               ) : (

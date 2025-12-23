@@ -267,3 +267,49 @@ button:disabled {
   background-color: #0056b3; /* Biru Solid yang lebih gelap saat hover */
   border-color: transparent; /* Pastikan tidak ada border saat hover */
 }
+
+/* ======================================================================== */
+/*      GAYA RESPONSIVE (HANYA UNTUK TABEL LOG AKTIVITAS)                 */
+/* ======================================================================== */
+
+@media screen and (max-width: 768px) {
+
+  /* Hanya target tabel yang memiliki kelas .log-table */
+  .log-table thead {
+    display: none; /* Sembunyikan header di seluler */
+  }
+
+  .log-table tr {
+    display: block; /* Ubah baris menjadi blok (kartu) */
+    margin-bottom: 1rem;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 1rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  }
+
+  .log-table td {
+    display: block; /* Ubah sel menjadi blok */
+    text-align: right; /* Ratakan teks ke kanan */
+    position: relative;
+    padding-left: 50%; /* Beri ruang untuk label */
+    border-bottom: 1px solid #eee;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+    white-space: normal; /* Kembalikan white-space agar teks bisa wrap */
+  }
+
+  .log-table tr td:last-child {
+    border-bottom: none; /* Hapus border di sel terakhir */
+  }
+
+  /* Buat label dari atribut data-label di JSX */
+  .log-table td::before {
+    content: attr(data-label);
+    position: absolute;
+    left: 10px;
+    font-weight: bold;
+    text-align: left;
+    white-space: nowrap;
+  }
+}

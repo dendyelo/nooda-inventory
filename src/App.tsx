@@ -1,4 +1,4 @@
-// File: src/App.tsx (Versi 5.21 - Dengan Pencarian Profil Lokal)
+// File: src/App.tsx (Versi 5.22 - Perbaikan Dialog Konfirmasi)
 
 import { useState, useEffect, type FormEvent } from 'react';
 import { supabase } from './lib/supabaseClient';
@@ -9,7 +9,8 @@ import './App.css';
 type Product = { id: number; name: string; sku: string; stock: number; };
 type Component = { id: number; name: string; stock: number; unit: string; };
 type ActivityLog = { id: number; created_at: string; description: string; username: string | null; };
-type Profile = { id: string; username: string; }; // Tipe baru untuk data profil
+type Profile = { id: string; username: string; };
+type ProductComponent = { product_id: number; component_id: number; quantity_needed: number; process_type: 'PRODUCTION' | 'SALE'; }; // Tipe dikembalikan
 
 type SaleQuantities = { [productId: number]: number; };
 
@@ -19,13 +20,14 @@ interface AppProps {
 }
 
 export default function App({ user }: AppProps) {
-  const APP_VERSION = "v5.21";
+  const APP_VERSION = "v5.22";
 
   // States
   const [components, setComponents] = useState<Component[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [productComponents, setProductComponents] = useState<ProductComponent[]>([]); // State dikembalikan
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
-  const [profiles, setProfiles] = useState<Profile[]>([]); // State baru untuk menyimpan semua profil
+  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -56,15 +58,16 @@ export default function App({ user }: AppProps) {
   // Fungsi untuk mengambil semua data
   const fetchData = async () => {
     try {
-      // Tambahkan panggilan untuk mengambil semua profil
-      const [compRes, prodRes, logRes, profileRes] = await Promise.all([
+      // Tambahkan panggilan untuk mengambil product_components
+      const [compRes, prodRes, logRes, profileRes, pcRes] = await Promise.all([
         supabase.from('components').select('*').order('name'),
         supabase.from('products').select('*'),
         supabase.from('activity_logs').select('id, created_at, description, username').order('created_at', { ascending: false }).limit(20),
-        supabase.from('profiles').select('id, username') // Ambil daftar ID dan username
+        supabase.from('profiles').select('id, username'),
+        supabase.from('product_components').select('*') // Panggilan dikembalikan
       ]);
 
-      const errors = [compRes.error, prodRes.error, logRes.error, profileRes.error].filter(Boolean);
+      const errors = [compRes.error, prodRes.error, logRes.error, profileRes.error, pcRes.error].filter(Boolean);
       if (errors.length > 0) {
         throw new Error(errors.map(e => e!.message).join(', '));
       }
@@ -72,7 +75,8 @@ export default function App({ user }: AppProps) {
       setComponents(compRes.data || []);
       setProducts(prodRes.data || []);
       setActivityLogs(logRes.data || []);
-      setProfiles(profileRes.data || []); // Simpan daftar profil ke state
+      setProfiles(profileRes.data || []);
+      setProductComponents(pcRes.data || []); // State dikembalikan
 
       if (prodRes.data?.length) {
         const sortedProducts = [...prodRes.data].sort(sortProducts);
@@ -116,21 +120,42 @@ export default function App({ user }: AppProps) {
     }
   };
 
-  // Handler untuk form produksi
+  // Handler untuk form produksi (dengan konfirmasi)
   const handleProductionSubmit = (e: FormEvent) => {
     e.preventDefault();
     const quantity = parseInt(prodQuantity, 10);
     const productId = parseInt(prodProductId, 10);
+
     if (isNaN(productId) || isNaN(quantity) || quantity <= 0) {
       alert("Harap pilih produk dan masukkan jumlah produksi yang valid.");
       return;
     }
-    invokeFunction('produce-dcp', { productId, quantity }, 'Produksi berhasil diselesaikan!').then(success => {
-      if (success) setProdQuantity('');
-    });
+    const product = products.find(p => p.id === productId);
+    if (!product) return;
+
+    const recipe = {
+      'DCP-MINI': ['Botol Mini'],
+      'DCP-CORE': ['Botol Core'],
+      'DCP-PRO': ['Botol Pro', 'Seal Pro', 'Sprayer Pro', 'Tutup Botol Pro'],
+    }[product.sku] || [];
+
+    const stockImpactSummary = recipe.map(compName => {
+      const component = components.find(c => c.name === compName);
+      if (!component) return `  - ${compName}: Data tidak ditemukan`;
+      const newStock = component.stock - (1 * quantity);
+      return `  - ${compName}: ${component.stock} -> ${newStock}`;
+    }).join('\n');
+
+    const confirmationMessage = `Anda akan memproduksi:\n\n${quantity}x ${product.name}\n\nIni akan mengubah stok komponen:\n${stockImpactSummary}\n\nLanjutkan?`;
+    
+    if (window.confirm(confirmationMessage)) {
+      invokeFunction('produce-dcp', { productId, quantity }, 'Produksi berhasil diselesaikan!').then(success => {
+        if (success) setProdQuantity('');
+      });
+    }
   };
 
-  // Handler untuk penyesuaian stok bahan baku
+  // Handler untuk penyesuaian stok bahan baku (konfirmasi sudah ada)
   const handleModifyComponentStock = async (component: Component, action: 'add' | 'subtract') => {
     const amountStr = window.prompt(`Masukkan jumlah untuk ${action === 'add' ? 'DITAMBAH' : 'DIKURANGI'}:\n${component.name}`, "0");
     if (amountStr === null) return;
@@ -152,10 +177,8 @@ export default function App({ user }: AppProps) {
       const { error: updateError } = await supabase.from('components').update({ stock: newStock }).eq('id', component.id);
       if (updateError) throw updateError;
 
-      // **PERBAIKAN KUNCI:** Cari username dari state 'profiles' yang sudah kita ambil
       const userProfile = profiles.find(p => p.id === user.id);
       const username = userProfile ? userProfile.username : 'Pengguna Tidak Dikenal';
-
       const description = `Stok ${component.name} diubah dari ${component.stock} ${component.unit} menjadi ${newStock} ${component.unit}.`;
       
       await supabase.from('activity_logs').insert({
@@ -163,7 +186,7 @@ export default function App({ user }: AppProps) {
         description: description,
         details: { component_id: component.id, old_stock: component.stock, new_stock: newStock },
         user_id: user.id,
-        username: username // Gunakan username yang sudah dicari
+        username: username
       });
 
       alert("Stok berhasil diperbarui!");
@@ -175,7 +198,7 @@ export default function App({ user }: AppProps) {
     }
   };
 
-  // Handler untuk form penjualan
+  // Handler untuk form penjualan (dengan konfirmasi)
   const handleSaleSubmit = (e: FormEvent) => {
     e.preventDefault();
     const itemsToSell = Object.entries(saleQuantities)
@@ -185,9 +208,36 @@ export default function App({ user }: AppProps) {
       alert("Tidak ada produk untuk dijual.");
       return;
     }
-    invokeFunction('record-sale', { items: itemsToSell }, 'Penjualan berhasil dicatat!').then(success => {
-      if (success) setSaleQuantities({});
-    });
+
+    const componentDeductions: { [key: number]: number } = {};
+    for (const item of itemsToSell) {
+      const saleRecipe = productComponents.filter(pc => 
+        pc.product_id === item.productId && pc.process_type === 'SALE'
+      );
+      for (const recipeItem of saleRecipe) {
+        componentDeductions[recipeItem.component_id] = (componentDeductions[recipeItem.component_id] || 0) + (recipeItem.quantity_needed * item.quantity);
+      }
+    }
+
+    const stockImpactSummary = Object.entries(componentDeductions).map(([componentId, deduction]) => {
+        const component = components.find(c => c.id === Number(componentId));
+        if (!component) return null;
+        const newStock = component.stock - deduction;
+        return `  - ${component.name}: ${component.stock} -> ${newStock}`;
+      }).filter(line => line).join('\n');
+
+    const saleSummary = itemsToSell.map(item => {
+        const product = products.find(p => p.id === item.productId);
+        return `${item.quantity}x ${product?.name || '?'}`;
+      }).join('\n');
+
+    const confirmationMessage = `Anda yakin ingin menjual:\n\n${saleSummary}\n\nIni akan mengubah stok bahan pengemasan:\n${stockImpactSummary || 'Tidak ada.'}\n\nLanjutkan?`;
+    
+    if (window.confirm(confirmationMessage)) {
+      invokeFunction('record-sale', { items: itemsToSell }, 'Penjualan berhasil dicatat!').then(success => {
+        if (success) setSaleQuantities({});
+      });
+    }
   };
 
   const handleQuantityChange = (productId: number, quantityStr: string) => {
@@ -199,7 +249,6 @@ export default function App({ user }: AppProps) {
     await supabase.auth.signOut();
   };
 
-  // Cari username dari state profiles untuk ditampilkan di user-bar
   const currentUserProfile = profiles.find(p => p.id === user.id);
   const displayUsername = currentUserProfile ? currentUserProfile.username : user.email;
 

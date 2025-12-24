@@ -313,3 +313,43 @@ button:disabled {
     white-space: nowrap;
   }
 }
+
+/* Gaya baru untuk header kategori di dalam tabel */
+.category-header td {
+  background-color: #e9ecef; /* Warna latar belakang abu-abu muda */
+  font-weight: 600;          /* Teks tebal */
+  color: #495057;             /* Warna teks abu-abu gelap */
+  border-bottom: 2px solid #dee2e6; /* Garis bawah yang lebih tebal */
+  padding-top: 0.5rem;       /* Padding atas yang lebih kecil */
+  padding-bottom: 0.5rem;    /* Padding bawah yang lebih kecil */
+}
+
+/* Hilangkan efek hover pada header kategori agar tidak interaktif */
+.category-header:hover,
+.category-header:active {
+  background-color: #e9ecef !important; /* Paksa warna latar tetap sama */
+}
+
+/* ======================================================================== */
+/*      GAYA LOG AKTIVITAS                                                  */
+/* ======================================================================== */
+
+/* Kontainer untuk semua detail di dalam sebuah log */
+.log-details {
+  display: block; /* Membuat <small> menjadi blok, menempati baris baru */
+  margin-top: 0.5rem; /* Memberi sedikit jarak dari deskripsi utama */
+  color: #6c757d; /* Warna teks sedikit lebih pudar */
+}
+
+/* Judul di dalam detail log (misalnya, "Barang Terjual:", "Dampak Stok:") */
+.log-details strong {
+  display: block; /* Membuat <strong> menjadi blok, menempati baris baru */
+  margin-top: 0.25rem; /* Memberi jarak antar bagian detail */
+  font-weight: 600;
+}
+
+/* Setiap baris item di dalam detail log */
+.log-details span {
+  display: block; /* Membuat <span> menjadi blok, menempati baris baru */
+  padding-left: 0.5rem; /* Sedikit indentasi agar terlihat rapi */
+}

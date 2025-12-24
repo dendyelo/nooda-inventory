@@ -1,4 +1,4 @@
-// File: src/LoginPage.tsx (Versi Final - Login dengan Username)
+// File: src/LoginPage.tsx (Versi Final 2.1 - Dengan Sinkronisasi Username ke Metadata)
 
 import { useState } from 'react';
 import { supabase } from './lib/supabaseClient';
@@ -6,7 +6,6 @@ import './LoginPage.css';
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
-  // Ganti state dari 'email' menjadi 'username'
   const [username, setUsername] = useState(''); 
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
@@ -18,12 +17,10 @@ export default function LoginPage() {
 
     try {
       // LANGKAH A & B: Terjemahkan username menjadi email
-      // 1. Panggil fungsi 'get_email_from_username' yang baru kita buat
       const { data: emailData, error: rpcError } = await supabase.rpc('get_email_from_username', {
         p_username: username
       });
 
-      // 2. Jika ada error saat memanggil fungsi atau username tidak ditemukan
       if (rpcError || !emailData) {
         throw new Error("Username atau password salah.");
       }
@@ -31,23 +28,40 @@ export default function LoginPage() {
       const email = emailData as string;
 
       // LANGKAH C: Lakukan login menggunakan email yang sudah didapat
-      const { error: signInError } = await supabase.auth.signInWithPassword({ 
-        email: email, // Gunakan email yang kita dapatkan
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ 
+        email: email,
         password: password 
       });
 
-      // Jika ada error saat login (artinya password salah)
       if (signInError) {
         throw new Error("Username atau password salah.");
       }
+      if (!signInData.user) {
+        throw new Error("Login berhasil tetapi data pengguna tidak ditemukan.");
+      }
+
+      // ========================================================================
+      //      LANGKAH D: (BARU & PENTING) SINKRONISASI USERNAME KE METADATA
+      // ========================================================================
+      // Setelah login berhasil, kita perbarui 'user_metadata' dengan username
+      // yang digunakan untuk login. Ini memastikan App.tsx bisa membacanya.
+      const { error: updateError } = await supabase.auth.updateUser({
+        data: { username: username } // Simpan username yang diketik pengguna
+      });
+
+      // Jika gagal update, tidak apa-apa, aplikasi tetap berjalan.
+      // Cukup catat sebagai peringatan di konsol untuk debugging.
+      if (updateError) {
+        console.warn("Peringatan: Gagal menyimpan username ke metadata:", updateError.message);
+      }
+      // ========================================================================
 
       // Jika semua berhasil, onAuthStateChange di main.tsx akan mengambil alih
+      // dan me-refresh halaman secara otomatis.
 
     } catch (error: any) {
-      // Tangkap semua kemungkinan error dan tampilkan pesannya
       setMessage(error.message);
     } finally {
-      // Pastikan loading selalu berhenti
       setLoading(false);
     }
   };
@@ -58,12 +72,11 @@ export default function LoginPage() {
         <h2>Inventaris Nooda</h2>
         <p>Silakan masuk untuk melanjutkan</p>
         <form onSubmit={handleLogin}>
-          {/* Ubah input dari 'email' menjadi 'username' */}
           <div className="input-group">
             <label htmlFor="username">Username</label>
             <input 
               id="username" 
-              type="text" // Ubah tipe menjadi 'text'
+              type="text"
               value={username} 
               onChange={(e) => setUsername(e.target.value)} 
               required 

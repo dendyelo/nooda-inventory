@@ -1,4 +1,4 @@
-// File: src/App.tsx (Versi 7.3.0 - Log Super Detail)
+// File: src/App.tsx (Versi 7.4.0 - BENAR & LENGKAP)
 
 import { useState, useEffect, type FormEvent } from 'react';
 import { supabase } from './lib/supabaseClient';
@@ -6,12 +6,12 @@ import type { User, PostgrestError } from '@supabase/supabase-js';
 import './App.css';
 
 // Tipe Data
-type Product = { id: number; name: string; sku: string; stock: number; category_id: number | null; };
+// PERUBAHAN 1: Tambahkan 'sort_order' ke tipe Product
+type Product = { id: number; name: string; sku: string; stock: number; category_id: number | null; sort_order: number; };
 type Component = { id: number; name: string; stock: number; unit: string; };
 type Category = { id: number; name: string; };
 type ProductComponent = { product_id: number; component_id: number; quantity_needed: number; process_type: 'PRODUCTION' | 'SALE'; };
 
-// Tipe Log diperbarui untuk mencocokkan data detail dari backend
 type ActivityLog = { 
   id: number; 
   created_at: string; 
@@ -37,7 +37,7 @@ const getStockRowClass = (stock: number, name: string): string => {
 };
 
 export default function App({ user }: AppProps) {
-  const APP_VERSION = "v7.3.0";
+  const APP_VERSION = "v7.4.0";
 
   const [components, setComponents] = useState<Component[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -57,10 +57,10 @@ export default function App({ user }: AppProps) {
     try {
       const [compRes, prodRes, catRes, pcRes, logRes] = await Promise.all([
         supabase.from('components').select('*').order('name'),
-        supabase.from('products').select('*').order('name'),
+        // PERUBAHAN 2: Ubah pengurutan produk menjadi berdasarkan 'sort_order'
+        supabase.from('products').select('*').order('sort_order', { ascending: true }),
         supabase.from('categories').select('*').order('name'),
         supabase.from('product_components').select('*'),
-        // Pastikan kita mengambil kolom 'details' dari tabel log
         supabase.from('activity_logs').select('id, created_at, description, username, details').order('created_at', { ascending: false }).limit(20)
       ]);
       
@@ -86,7 +86,6 @@ export default function App({ user }: AppProps) {
   const invokeFunction = async (name: 'record-sale' | 'produce-dcp', body: object): Promise<boolean> => {
     setIsSubmitting(true);
     try {
-      // Kirim data lengkap termasuk userId dan username ke Edge Function
       const { error } = await supabase.functions.invoke(name, { body: { ...body, userId: user.id, username: username } });
       if (error) throw error;
       return true;
@@ -122,7 +121,6 @@ export default function App({ user }: AppProps) {
     const confirmationMessage = `Anda akan memproduksi:\n\n${quantity}x ${product.name}\n\n[DAMPAK PADA STOK]\n${impactLines.join('\n')}\n\nLanjutkan?`;
     
     if (window.confirm(confirmationMessage)) {
-      // Kirim 'impactSummary' ke Edge Function untuk dicatat di log
       const success = await invokeFunction('produce-dcp', { productId, quantity, impactSummary: impactLines });
       if (success) { alert('Produksi berhasil diselesaikan!'); setProdQuantity(''); await fetchData(); }
     }
@@ -162,7 +160,6 @@ export default function App({ user }: AppProps) {
     const confirmationMessage = `Anda akan mencatat penjualan:\n\n[BARANG TERJUAL]\n${saleSummaryLines.join('\n')}\n\n[DAMPAK PADA STOK]\n${impactLines.join('\n')}\n\nLanjutkan?`.trim().replace(/^\s+/gm, '');
 
     if (window.confirm(confirmationMessage)) {
-      // Kirim 'saleSummary' dan 'impactSummary' ke Edge Function untuk dicatat di log
       const success = await invokeFunction('record-sale', { items: itemsToSell, saleSummary: saleSummaryLines, impactSummary: impactLines });
       if (success) { alert('Penjualan berhasil dicatat!'); setSaleQuantities({}); await fetchData(); }
     }
@@ -204,7 +201,6 @@ export default function App({ user }: AppProps) {
       <div className="user-bar"><span>Login sebagai: <strong>{username}</strong></span><button className="logout-button" onClick={() => supabase.auth.signOut()}>Logout</button></div>
       <h1>Inventaris Nooda</h1>
       
-      {/* Produk Jadi & Penjualan */}
       <div className="section-container">
         <h2>Produk Jadi & Penjualan</h2>
         <table className="stock-table">
@@ -242,7 +238,6 @@ export default function App({ user }: AppProps) {
         </div>
       </div>
       
-      {/* Bahan Baku */}
       <div className="section-container">
         <h2>Bahan Baku</h2>
         <table className="stock-table">
@@ -261,7 +256,6 @@ export default function App({ user }: AppProps) {
         </table>
       </div>
       
-      {/* Jalankan Produksi */}
       <div className="section-container">
         <h2>Jalankan Produksi</h2>
         <div className="form-panel production-panel">
@@ -273,7 +267,6 @@ export default function App({ user }: AppProps) {
         </div>
       </div>
       
-      {/* Log Aktivitas Terbaru */}
       <div className="section-container">
         <h2>Log Aktivitas Terbaru</h2>
         <div className="log-table-container">
@@ -285,7 +278,6 @@ export default function App({ user }: AppProps) {
                   <td data-label="Waktu">{new Date(log.created_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}</td>
                   <td data-label="Aksi" style={{ whiteSpace: 'pre-wrap' }}>
                     {log.description}
-                    {/* Tampilkan detail log jika ada */}
                     {log.details && (
                       <small className="log-details">
                         {log.details.sale_summary && (

@@ -1,4 +1,4 @@
-// File: src/App.tsx (Versi 8.0.0 - RPC untuk Produksi & Penjualan)
+// File: src/App.tsx (Versi 8.0.1 - Final Clean-up)
 
 import { useState, useEffect, type FormEvent } from 'react';
 import { supabase } from './lib/supabaseClient';
@@ -10,7 +10,6 @@ type StockItem = { name: string; warning_limit: number | null; };
 type Product = StockItem & { id: number; sku: string; stock: number; category_id: number | null; sort_order: number; };
 type Component = StockItem & { id: number; stock: number; unit: string; };
 type Category = { id: number; name: string; };
-type ProductComponent = { product_id: number; component_id: number; quantity_needed: number; process_type: 'PRODUCTION' | 'SALE'; };
 type ActivityLog = { id: number; created_at: string; description: string; username: string | null; details: { sale_summary?: string[]; production_summary?: string[]; impact_summary?: string[]; } | null; };
 
 const getStockRowClass = (stock: number, item: StockItem): string => {
@@ -24,12 +23,11 @@ type SaleQuantities = { [productId: number]: number; };
 type AppProps = { user: User; };
 
 export default function App({ user }: AppProps) {
-  const APP_VERSION = "v8.0.0";
+  const APP_VERSION = "v8.0.1";
 
   const [components, setComponents] = useState<Component[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [productComponents, setProductComponents] = useState<ProductComponent[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,20 +40,22 @@ export default function App({ user }: AppProps) {
 
   const fetchData = async () => {
     try {
-      const [compRes, prodRes, catRes, pcRes, logRes] = await Promise.all([
+      // Panggilan ke 'product_components' telah dihapus dari sini untuk efisiensi.
+      const [compRes, prodRes, catRes, logRes] = await Promise.all([
         supabase.from('components').select('*').order('name'),
         supabase.from('products').select('*').order('sort_order', { ascending: true }),
         supabase.from('categories').select('*').order('name'),
-        supabase.from('product_components').select('*'),
         supabase.from('activity_logs').select('id, created_at, description, username, details').order('created_at', { ascending: false }).limit(20)
       ]);
-      const errors: PostgrestError[] = [compRes.error, prodRes.error, catRes.error, pcRes.error, logRes.error].filter((e): e is PostgrestError => e !== null);
+      
+      const errors: PostgrestError[] = [compRes.error, prodRes.error, catRes.error, logRes.error].filter((e): e is PostgrestError => e !== null);
       if (errors.length > 0) throw new Error(errors.map(e => e.message).join(', '));
+
       setComponents(compRes.data || []);
       setProducts(prodRes.data || []);
       setCategories(catRes.data || []);
-      setProductComponents(pcRes.data || []);
       setActivityLogs(logRes.data || []);
+      
       if (prodRes.data?.length && !prodProductId) setProdProductId(prodRes.data[0].id.toString());
     } catch (err: any) { setError(err.message); } finally { setLoading(false); }
   };
@@ -80,57 +80,36 @@ export default function App({ user }: AppProps) {
   const handleProductionSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-
     const quantity = parseInt(prodQuantity, 10);
     const productId = parseInt(prodProductId, 10);
-
     if (isNaN(productId) || isNaN(quantity) || quantity <= 0) {
       alert("Harap pilih produk dan masukkan jumlah produksi yang valid.");
       setIsSubmitting(false);
       return;
     }
-
     try {
-      // Panggil fungsi RPC untuk mendapatkan pratinjau dari server
-      const { data: previewData, error: rpcError } = await supabase.rpc('get_production_impact_preview', {
-        p_product_id: productId,
-        p_quantity: quantity
-      });
-
+      const { data: previewData, error: rpcError } = await supabase.rpc('get_production_impact_preview', { p_product_id: productId, p_quantity: quantity });
       if (rpcError) throw rpcError;
-
       const { production_summary, impact_summary } = previewData;
-
       if (impact_summary.length === 0) {
         alert(`Tidak ada resep produksi yang ditemukan untuk produk ini.`);
         setIsSubmitting(false);
         return;
       }
-
       const confirmationMessage = `Anda akan memproduksi:\n\n${production_summary}\n\n[DAMPAK PADA STOK]\n${impact_summary.join('\n')}\n\nLanjutkan?`;
-
       if (window.confirm(confirmationMessage)) {
-        // Jika dikonfirmasi, panggil Edge Function seperti biasa
-        const success = await invokeFunction('produce-dcp', { 
-          productId, 
-          quantity, 
-          productionSummary: [production_summary], // Kirim sebagai array agar konsisten
-          impactSummary: impact_summary 
-        });
-
+        const success = await invokeFunction('produce-dcp', { productId, quantity, productionSummary: [production_summary], impactSummary: impact_summary });
         if (success) {
           alert('Produksi berhasil diselesaikan!');
           setProdQuantity('');
           await fetchData();
         }
+      } else {
+        setIsSubmitting(false); // Pastikan tombol tidak terkunci jika dibatalkan
       }
     } catch (err: any) {
       alert(`Terjadi kesalahan saat memproses produksi:\n${err.message}`);
-    } finally {
-      // Pastikan tombol tidak terkunci jika pengguna membatalkan konfirmasi
-      if (!window.confirm) {
-        setIsSubmitting(false);
-      }
+      setIsSubmitting(false);
     }
   };
 
@@ -156,11 +135,12 @@ export default function App({ user }: AppProps) {
           setSaleQuantities({});
           await fetchData();
         }
+      } else {
+        setIsSubmitting(false); // Pastikan tombol tidak terkunci jika dibatalkan
       }
     } catch (err: any) {
       alert(`Terjadi kesalahan saat memproses penjualan:\n${err.message}`);
-    } finally {
-      if (!window.confirm) { setIsSubmitting(false); }
+      setIsSubmitting(false);
     }
   };
 

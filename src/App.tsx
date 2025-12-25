@@ -1,4 +1,4 @@
-// File: src/App.tsx (Versi 7.7.0 - Batas Peringatan Universal)
+// File: src/App.tsx (Versi 7.8.0 - Tanpa Batas Default)
 
 import { useState, useEffect, type FormEvent } from 'react';
 import { supabase } from './lib/supabaseClient';
@@ -6,9 +6,7 @@ import type { User, PostgrestError } from '@supabase/supabase-js';
 import './App.css';
 
 // Tipe Data
-// Definisikan tipe dasar 'StockItem' yang memiliki properti umum untuk peringatan.
 type StockItem = { name: string; warning_limit: number | null; };
-// Perluas tipe Product dan Component dengan StockItem.
 type Product = StockItem & { id: number; sku: string; stock: number; category_id: number | null; sort_order: number; };
 type Component = StockItem & { id: number; stock: number; unit: string; };
 
@@ -16,16 +14,22 @@ type Category = { id: number; name: string; };
 type ProductComponent = { product_id: number; component_id: number; quantity_needed: number; process_type: 'PRODUCTION' | 'SALE'; };
 type ActivityLog = { id: number; created_at: string; description: string; username: string | null; details: { sale_summary?: string[]; production_summary?: string[]; impact_summary?: string[]; } | null; };
 
-// Konfigurasi default, berlaku jika batas di database adalah NULL.
-const DEFAULT_WARNING_LIMIT = 20;
+// PERUBAHAN 1: Konstanta DEFAULT_WARNING_LIMIT telah dihapus.
 
-// Fungsi getStockRowClass sekarang benar-benar universal.
+// PERUBAHAN 2: Logika getStockRowClass disederhanakan sesuai ide Anda.
 const getStockRowClass = (stock: number, item: StockItem): string => {
-  // Gunakan batas dari item jika ada, jika tidak (NULL), gunakan default.
-  const warningLimit = item.warning_limit ?? DEFAULT_WARNING_LIMIT;
+  const warningLimit = item.warning_limit;
 
+  // Aturan 1: Jika stok adalah 0, selalu berbahaya (merah).
   if (stock === 0) return 'stock-danger';
-  if (stock < warningLimit) return 'stock-warning';
+
+  // Aturan 2: Jika ada batas peringatan (bukan NULL) DAN stok di bawahnya,
+  // maka beri peringatan (kuning).
+  if (warningLimit !== null && stock < warningLimit) {
+    return 'stock-warning';
+  }
+
+  // Aturan 3: Jika tidak, tidak ada warna khusus.
   return '';
 };
 
@@ -33,7 +37,7 @@ type SaleQuantities = { [productId: number]: number; };
 type AppProps = { user: User; };
 
 export default function App({ user }: AppProps) {
-  const APP_VERSION = "v7.7.0";
+  const APP_VERSION = "v7.8.0";
 
   const [components, setComponents] = useState<Component[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -51,7 +55,6 @@ export default function App({ user }: AppProps) {
 
   const fetchData = async () => {
     try {
-      // Pastikan kita mengambil kolom 'warning_limit' dari KEDUA tabel.
       const [compRes, prodRes, catRes, pcRes, logRes] = await Promise.all([
         supabase.from('components').select('*').order('name'),
         supabase.from('products').select('*').order('sort_order', { ascending: true }),
@@ -197,7 +200,6 @@ export default function App({ user }: AppProps) {
             {categories.map(category => (<>
               <tr key={`cat-header-${category.id}`} className="category-header"><td colSpan={3}>{category.name}</td></tr>
               {products.filter(p => p.category_id === category.id).map(p => (
-                // Teruskan seluruh objek produk 'p' ke getStockRowClass
                 <tr key={p.id} className={getStockRowClass(p.stock, p)} onTouchStart={() => {}}>
                   <td data-label="Produk">{p.name}</td><td data-label="SKU">{p.sku}</td><td data-label="Stok">{p.stock}</td>
                 </tr>
@@ -233,7 +235,6 @@ export default function App({ user }: AppProps) {
           <thead><tr><th>Komponen</th><th>Stok</th><th>Satuan</th><th>Aksi</th></tr></thead>
           <tbody>
             {components.map(c => (
-              // Teruskan seluruh objek komponen 'c' ke getStockRowClass
               <tr key={c.id} className={getStockRowClass(c.stock, c)} onTouchStart={() => {}}>
                 <td data-label="Komponen">{c.name}</td><td data-label="Stok">{c.stock}</td><td data-label="Satuan">{c.unit}</td>
                 <td className="action-cell" data-label="Aksi">

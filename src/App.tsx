@@ -1,4 +1,4 @@
-// File: src/App.tsx (Versi 7.8.0 - Tanpa Batas Default)
+// File: src/App.tsx (Versi 8.0.0 - RPC untuk Produksi & Penjualan)
 
 import { useState, useEffect, type FormEvent } from 'react';
 import { supabase } from './lib/supabaseClient';
@@ -9,27 +9,14 @@ import './App.css';
 type StockItem = { name: string; warning_limit: number | null; };
 type Product = StockItem & { id: number; sku: string; stock: number; category_id: number | null; sort_order: number; };
 type Component = StockItem & { id: number; stock: number; unit: string; };
-
 type Category = { id: number; name: string; };
 type ProductComponent = { product_id: number; component_id: number; quantity_needed: number; process_type: 'PRODUCTION' | 'SALE'; };
 type ActivityLog = { id: number; created_at: string; description: string; username: string | null; details: { sale_summary?: string[]; production_summary?: string[]; impact_summary?: string[]; } | null; };
 
-// PERUBAHAN 1: Konstanta DEFAULT_WARNING_LIMIT telah dihapus.
-
-// PERUBAHAN 2: Logika getStockRowClass disederhanakan sesuai ide Anda.
 const getStockRowClass = (stock: number, item: StockItem): string => {
   const warningLimit = item.warning_limit;
-
-  // Aturan 1: Jika stok adalah 0, selalu berbahaya (merah).
   if (stock === 0) return 'stock-danger';
-
-  // Aturan 2: Jika ada batas peringatan (bukan NULL) DAN stok di bawahnya,
-  // maka beri peringatan (kuning).
-  if (warningLimit !== null && stock < warningLimit) {
-    return 'stock-warning';
-  }
-
-  // Aturan 3: Jika tidak, tidak ada warna khusus.
+  if (warningLimit !== null && stock < warningLimit) return 'stock-warning';
   return '';
 };
 
@@ -37,7 +24,7 @@ type SaleQuantities = { [productId: number]: number; };
 type AppProps = { user: User; };
 
 export default function App({ user }: AppProps) {
-  const APP_VERSION = "v7.8.0";
+  const APP_VERSION = "v8.0.0";
 
   const [components, setComponents] = useState<Component[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -62,22 +49,15 @@ export default function App({ user }: AppProps) {
         supabase.from('product_components').select('*'),
         supabase.from('activity_logs').select('id, created_at, description, username, details').order('created_at', { ascending: false }).limit(20)
       ]);
-      
       const errors: PostgrestError[] = [compRes.error, prodRes.error, catRes.error, pcRes.error, logRes.error].filter((e): e is PostgrestError => e !== null);
       if (errors.length > 0) throw new Error(errors.map(e => e.message).join(', '));
-
       setComponents(compRes.data || []);
       setProducts(prodRes.data || []);
       setCategories(catRes.data || []);
       setProductComponents(pcRes.data || []);
       setActivityLogs(logRes.data || []);
-
       if (prodRes.data?.length && !prodProductId) setProdProductId(prodRes.data[0].id.toString());
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+    } catch (err: any) { setError(err.message); } finally { setLoading(false); }
   };
 
   useEffect(() => { setLoading(true); fetchData(); }, []);
@@ -90,69 +70,97 @@ export default function App({ user }: AppProps) {
       return true;
     } catch (caughtError: any) {
       let errorMessage = "Terjadi kesalahan.";
-      if (caughtError.context?.json) {
-        try { errorMessage = (await caughtError.context.json()).error || errorMessage; } catch {}
-      } else if (caughtError.message) { errorMessage = caughtError.message; }
+      if (caughtError.context?.json) { try { errorMessage = (await caughtError.context.json()).error || errorMessage; } catch {} }
+      else if (caughtError.message) { errorMessage = caughtError.message; }
       alert(`GAGAL:\n${errorMessage}`);
       return false;
-    } finally {
-      setIsSubmitting(false);
-    }
+    } finally { setIsSubmitting(false); }
   };
 
   const handleProductionSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
+
     const quantity = parseInt(prodQuantity, 10);
     const productId = parseInt(prodProductId, 10);
-    if (isNaN(productId) || isNaN(quantity) || quantity <= 0) { alert("Harap pilih produk dan masukkan jumlah produksi yang valid."); return; }
-    const product = products.find(p => p.id === productId);
-    if (!product) return;
-    const recipe = productComponents.filter(pc => pc.product_id === productId && pc.process_type === 'PRODUCTION');
-    if (recipe.length === 0) { alert(`Tidak ada resep produksi yang ditemukan untuk ${product.name}.`); return; }
-    const impactLines = recipe.map(item => {
-      const component = components.find(c => c.id === item.component_id);
-      if (!component) return `- Komponen ID ${item.component_id} tidak ditemukan`;
-      const needed = item.quantity_needed * quantity;
-      return `- ${component.name}: ${component.stock} -> ${component.stock - needed}`;
-    });
-    const confirmationMessage = `Anda akan memproduksi:\n\n${quantity}x ${product.name}\n\n[DAMPAK PADA STOK]\n${impactLines.join('\n')}\n\nLanjutkan?`;
-    if (window.confirm(confirmationMessage)) {
-      const success = await invokeFunction('produce-dcp', { productId, quantity, impactSummary: impactLines });
-      if (success) { alert('Produksi berhasil diselesaikan!'); setProdQuantity(''); await fetchData(); }
+
+    if (isNaN(productId) || isNaN(quantity) || quantity <= 0) {
+      alert("Harap pilih produk dan masukkan jumlah produksi yang valid.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      // Panggil fungsi RPC untuk mendapatkan pratinjau dari server
+      const { data: previewData, error: rpcError } = await supabase.rpc('get_production_impact_preview', {
+        p_product_id: productId,
+        p_quantity: quantity
+      });
+
+      if (rpcError) throw rpcError;
+
+      const { production_summary, impact_summary } = previewData;
+
+      if (impact_summary.length === 0) {
+        alert(`Tidak ada resep produksi yang ditemukan untuk produk ini.`);
+        setIsSubmitting(false);
+        return;
+      }
+
+      const confirmationMessage = `Anda akan memproduksi:\n\n${production_summary}\n\n[DAMPAK PADA STOK]\n${impact_summary.join('\n')}\n\nLanjutkan?`;
+
+      if (window.confirm(confirmationMessage)) {
+        // Jika dikonfirmasi, panggil Edge Function seperti biasa
+        const success = await invokeFunction('produce-dcp', { 
+          productId, 
+          quantity, 
+          productionSummary: [production_summary], // Kirim sebagai array agar konsisten
+          impactSummary: impact_summary 
+        });
+
+        if (success) {
+          alert('Produksi berhasil diselesaikan!');
+          setProdQuantity('');
+          await fetchData();
+        }
+      }
+    } catch (err: any) {
+      alert(`Terjadi kesalahan saat memproses produksi:\n${err.message}`);
+    } finally {
+      // Pastikan tombol tidak terkunci jika pengguna membatalkan konfirmasi
+      if (!window.confirm) {
+        setIsSubmitting(false);
+      }
     }
   };
 
   const handleSaleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    const itemsToSell = Object.entries(saleQuantities).map(([pId, q]) => ({ productId: parseInt(pId), quantity: q })).filter(item => item.quantity > 0);
-    if (itemsToSell.length === 0) { alert("Tidak ada produk untuk dijual."); return; }
-    const impactMap: { [key: string]: { name: string; oldStock: number; change: number; } } = {};
-    const saleSummaryLines: string[] = [];
-    for (const item of itemsToSell) {
-      const product = products.find(p => p.id === item.productId);
-      if (!product) continue;
-      saleSummaryLines.push(`${item.quantity}x ${product.name}`);
-      const productKey = `product-${product.id}`;
-      if (!impactMap[productKey]) impactMap[productKey] = { name: product.name, oldStock: product.stock, change: 0 };
-      impactMap[productKey].change -= item.quantity;
-      const saleRecipe = productComponents.filter(pc => pc.product_id === item.productId && pc.process_type === 'SALE');
-      for (const recipeItem of saleRecipe) {
-        const component = components.find(c => c.id === recipeItem.component_id);
-        if (!component) continue;
-        const componentKey = `component-${component.id}`;
-        if (!impactMap[componentKey]) impactMap[componentKey] = { name: component.name, oldStock: component.stock, change: 0 };
-        impactMap[componentKey].change -= recipeItem.quantity_needed * item.quantity;
+    setIsSubmitting(true);
+    const itemsForEdgeFunction = Object.entries(saleQuantities).map(([productId, quantity]) => ({ productId: parseInt(productId, 10), quantity })).filter(item => item.quantity > 0);
+    if (itemsForEdgeFunction.length === 0) {
+      alert("Tidak ada produk untuk dijual.");
+      setIsSubmitting(false);
+      return;
+    }
+    const itemsForRpc = itemsForEdgeFunction.map(item => ({ product_id: item.productId, quantity: item.quantity }));
+    try {
+      const { data: previewData, error: rpcError } = await supabase.rpc('get_sale_impact_preview', { items_to_sell: itemsForRpc });
+      if (rpcError) throw rpcError;
+      const { sale_summary, impact_summary } = previewData;
+      const confirmationMessage = `Anda akan mencatat penjualan:\n\n[BARANG TERJUAL]\n${sale_summary.join('\n')}\n\n[DAMPAK PADA STOK]\n${impact_summary.join('\n')}\n\nLanjutkan?`;
+      if (window.confirm(confirmationMessage)) {
+        const success = await invokeFunction('record-sale', { items: itemsForEdgeFunction, saleSummary: sale_summary, impactSummary: impact_summary });
+        if (success) {
+          alert('Penjualan berhasil dicatat!');
+          setSaleQuantities({});
+          await fetchData();
+        }
       }
-    }
-    const impactLines: string[] = [];
-    for (const key in impactMap) {
-      const { name, oldStock, change } = impactMap[key];
-      impactLines.push(`- ${name}: ${oldStock} -> ${oldStock + change}`);
-    }
-    const confirmationMessage = `Anda akan mencatat penjualan:\n\n[BARANG TERJUAL]\n${saleSummaryLines.join('\n')}\n\n[DAMPAK PADA STOK]\n${impactLines.join('\n')}\n\nLanjutkan?`.trim().replace(/^\s+/gm, '');
-    if (window.confirm(confirmationMessage)) {
-      const success = await invokeFunction('record-sale', { items: itemsToSell, saleSummary: saleSummaryLines, impactSummary: impactLines });
-      if (success) { alert('Penjualan berhasil dicatat!'); setSaleQuantities({}); await fetchData(); }
+    } catch (err: any) {
+      alert(`Terjadi kesalahan saat memproses penjualan:\n${err.message}`);
+    } finally {
+      if (!window.confirm) { setIsSubmitting(false); }
     }
   };
 
@@ -172,11 +180,7 @@ export default function App({ user }: AppProps) {
       await supabase.from('activity_logs').insert({ action_type: 'STOCK_ADJUSTMENT', description, user_id: user.id, username });
       alert("Stok berhasil diperbarui!");
       await fetchData();
-    } catch (err: any) {
-      alert(`GAGAL:\n${err.message}`);
-    } finally {
-      setIsSubmitting(false);
-    }
+    } catch (err: any) { alert(`GAGAL:\n${err.message}`); } finally { setIsSubmitting(false); }
   };
 
   const handleQuantityChange = (productId: number, quantityStr: string) => {
@@ -191,7 +195,6 @@ export default function App({ user }: AppProps) {
     <div className="App">
       <div className="user-bar"><span>Login sebagai: <strong>{username}</strong></span><button className="logout-button" onClick={() => supabase.auth.signOut()}>Logout</button></div>
       <h1>Inventaris Nooda</h1>
-      
       <div className="section-container">
         <h2>Produk Jadi & Penjualan</h2>
         <table className="stock-table">
@@ -228,7 +231,6 @@ export default function App({ user }: AppProps) {
           </form>
         </div>
       </div>
-      
       <div className="section-container">
         <h2>Bahan Baku</h2>
         <table className="stock-table">
@@ -246,7 +248,6 @@ export default function App({ user }: AppProps) {
           </tbody>
         </table>
       </div>
-      
       <div className="section-container">
         <h2>Jalankan Produksi</h2>
         <div className="form-panel production-panel">
@@ -257,7 +258,6 @@ export default function App({ user }: AppProps) {
           </form>
         </div>
       </div>
-      
       <div className="section-container">
         <h2>Log Aktivitas Terbaru</h2>
         <div className="log-table-container">
@@ -284,7 +284,6 @@ export default function App({ user }: AppProps) {
           </table>
         </div>
       </div>
-      
       <footer className="app-footer">Aplikasi Inventaris Nooda | Versi: {APP_VERSION}</footer>
     </div>
   );

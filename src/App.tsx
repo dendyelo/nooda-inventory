@@ -1,4 +1,4 @@
-// File: src/App.tsx (Versi 7.4.0 - BENAR & LENGKAP)
+// File: src/App.tsx (Versi 7.5.0 - Konfigurasi Batas Peringatan)
 
 import { useState, useEffect, type FormEvent } from 'react';
 import { supabase } from './lib/supabaseClient';
@@ -6,38 +6,44 @@ import type { User, PostgrestError } from '@supabase/supabase-js';
 import './App.css';
 
 // Tipe Data
-// PERUBAHAN 1: Tambahkan 'sort_order' ke tipe Product
 type Product = { id: number; name: string; sku: string; stock: number; category_id: number | null; sort_order: number; };
 type Component = { id: number; name: string; stock: number; unit: string; };
 type Category = { id: number; name: string; };
 type ProductComponent = { product_id: number; component_id: number; quantity_needed: number; process_type: 'PRODUCTION' | 'SALE'; };
+type ActivityLog = { id: number; created_at: string; description: string; username: string | null; details: { sale_summary?: string[]; production_summary?: string[]; impact_summary?: string[]; } | null; };
 
-type ActivityLog = { 
-  id: number; 
-  created_at: string; 
-  description: string; 
-  username: string | null; 
-  details: {
-    sale_summary?: string[];
-    production_summary?: string[];
-    impact_summary?: string[];
-  } | null;
-};
-
-type SaleQuantities = { [productId: number]: number; };
-type AppProps = { user: User; };
+// ========================================================================
+//      KONFIGURASI BATAS STOK PERINGATAN
+// ========================================================================
+// Daftar item dengan batas peringatan khusus. Tambahkan nama komponen di sini.
+const SPECIAL_WARNING_ITEMS = [
+  'Buble Warp', 
+  'Lakban Bening', 
+  'Lakban Fragile',
+  'Air Murni'
+];
+// Batas stok default untuk peringatan (warna kuning).
+const DEFAULT_WARNING_LIMIT = 20;
+// Batas stok khusus untuk item dalam daftar di atas.
+const SPECIAL_WARNING_LIMIT = 2;
+// ========================================================================
 
 const getStockRowClass = (stock: number, name: string): string => {
-  const specialItems = ['Buble Warp', 'Lakban Bening', 'Lakban Fragile'];
-  let warningLimit = 20;
-  if (specialItems.includes(name)) warningLimit = 2;
+  // Logika sekarang merujuk ke konstanta konfigurasi di atas.
+  const warningLimit = SPECIAL_WARNING_ITEMS.includes(name) 
+    ? SPECIAL_WARNING_LIMIT 
+    : DEFAULT_WARNING_LIMIT;
+
   if (stock === 0) return 'stock-danger';
   if (stock < warningLimit) return 'stock-warning';
   return '';
 };
 
+type SaleQuantities = { [productId: number]: number; };
+type AppProps = { user: User; };
+
 export default function App({ user }: AppProps) {
-  const APP_VERSION = "v7.4.0";
+  const APP_VERSION = "v7.5.0";
 
   const [components, setComponents] = useState<Component[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -57,7 +63,6 @@ export default function App({ user }: AppProps) {
     try {
       const [compRes, prodRes, catRes, pcRes, logRes] = await Promise.all([
         supabase.from('components').select('*').order('name'),
-        // PERUBAHAN 2: Ubah pengurutan produk menjadi berdasarkan 'sort_order'
         supabase.from('products').select('*').order('sort_order', { ascending: true }),
         supabase.from('categories').select('*').order('name'),
         supabase.from('product_components').select('*'),

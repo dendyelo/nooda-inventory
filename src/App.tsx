@@ -1,4 +1,4 @@
-// File: src/App.tsx (Versi 7.5.0 - Konfigurasi Batas Peringatan)
+// File: src/App.tsx (Versi 7.7.0 - Batas Peringatan Universal)
 
 import { useState, useEffect, type FormEvent } from 'react';
 import { supabase } from './lib/supabaseClient';
@@ -6,33 +6,23 @@ import type { User, PostgrestError } from '@supabase/supabase-js';
 import './App.css';
 
 // Tipe Data
-type Product = { id: number; name: string; sku: string; stock: number; category_id: number | null; sort_order: number; };
-type Component = { id: number; name: string; stock: number; unit: string; };
+// Definisikan tipe dasar 'StockItem' yang memiliki properti umum untuk peringatan.
+type StockItem = { name: string; warning_limit: number | null; };
+// Perluas tipe Product dan Component dengan StockItem.
+type Product = StockItem & { id: number; sku: string; stock: number; category_id: number | null; sort_order: number; };
+type Component = StockItem & { id: number; stock: number; unit: string; };
+
 type Category = { id: number; name: string; };
 type ProductComponent = { product_id: number; component_id: number; quantity_needed: number; process_type: 'PRODUCTION' | 'SALE'; };
 type ActivityLog = { id: number; created_at: string; description: string; username: string | null; details: { sale_summary?: string[]; production_summary?: string[]; impact_summary?: string[]; } | null; };
 
-// ========================================================================
-//      KONFIGURASI BATAS STOK PERINGATAN
-// ========================================================================
-// Daftar item dengan batas peringatan khusus. Tambahkan nama komponen di sini.
-const SPECIAL_WARNING_ITEMS = [
-  'Buble Warp', 
-  'Lakban Bening', 
-  'Lakban Fragile',
-  'Air Murni'
-];
-// Batas stok default untuk peringatan (warna kuning).
+// Konfigurasi default, berlaku jika batas di database adalah NULL.
 const DEFAULT_WARNING_LIMIT = 20;
-// Batas stok khusus untuk item dalam daftar di atas.
-const SPECIAL_WARNING_LIMIT = 2;
-// ========================================================================
 
-const getStockRowClass = (stock: number, name: string): string => {
-  // Logika sekarang merujuk ke konstanta konfigurasi di atas.
-  const warningLimit = SPECIAL_WARNING_ITEMS.includes(name) 
-    ? SPECIAL_WARNING_LIMIT 
-    : DEFAULT_WARNING_LIMIT;
+// Fungsi getStockRowClass sekarang benar-benar universal.
+const getStockRowClass = (stock: number, item: StockItem): string => {
+  // Gunakan batas dari item jika ada, jika tidak (NULL), gunakan default.
+  const warningLimit = item.warning_limit ?? DEFAULT_WARNING_LIMIT;
 
   if (stock === 0) return 'stock-danger';
   if (stock < warningLimit) return 'stock-warning';
@@ -43,7 +33,7 @@ type SaleQuantities = { [productId: number]: number; };
 type AppProps = { user: User; };
 
 export default function App({ user }: AppProps) {
-  const APP_VERSION = "v7.5.0";
+  const APP_VERSION = "v7.7.0";
 
   const [components, setComponents] = useState<Component[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -61,6 +51,7 @@ export default function App({ user }: AppProps) {
 
   const fetchData = async () => {
     try {
+      // Pastikan kita mengambil kolom 'warning_limit' dari KEDUA tabel.
       const [compRes, prodRes, catRes, pcRes, logRes] = await Promise.all([
         supabase.from('components').select('*').order('name'),
         supabase.from('products').select('*').order('sort_order', { ascending: true }),
@@ -115,16 +106,13 @@ export default function App({ user }: AppProps) {
     if (!product) return;
     const recipe = productComponents.filter(pc => pc.product_id === productId && pc.process_type === 'PRODUCTION');
     if (recipe.length === 0) { alert(`Tidak ada resep produksi yang ditemukan untuk ${product.name}.`); return; }
-    
     const impactLines = recipe.map(item => {
       const component = components.find(c => c.id === item.component_id);
       if (!component) return `- Komponen ID ${item.component_id} tidak ditemukan`;
       const needed = item.quantity_needed * quantity;
       return `- ${component.name}: ${component.stock} -> ${component.stock - needed}`;
     });
-
     const confirmationMessage = `Anda akan memproduksi:\n\n${quantity}x ${product.name}\n\n[DAMPAK PADA STOK]\n${impactLines.join('\n')}\n\nLanjutkan?`;
-    
     if (window.confirm(confirmationMessage)) {
       const success = await invokeFunction('produce-dcp', { productId, quantity, impactSummary: impactLines });
       if (success) { alert('Produksi berhasil diselesaikan!'); setProdQuantity(''); await fetchData(); }
@@ -135,10 +123,8 @@ export default function App({ user }: AppProps) {
     e.preventDefault();
     const itemsToSell = Object.entries(saleQuantities).map(([pId, q]) => ({ productId: parseInt(pId), quantity: q })).filter(item => item.quantity > 0);
     if (itemsToSell.length === 0) { alert("Tidak ada produk untuk dijual."); return; }
-
     const impactMap: { [key: string]: { name: string; oldStock: number; change: number; } } = {};
     const saleSummaryLines: string[] = [];
-
     for (const item of itemsToSell) {
       const product = products.find(p => p.id === item.productId);
       if (!product) continue;
@@ -155,15 +141,12 @@ export default function App({ user }: AppProps) {
         impactMap[componentKey].change -= recipeItem.quantity_needed * item.quantity;
       }
     }
-
     const impactLines: string[] = [];
     for (const key in impactMap) {
       const { name, oldStock, change } = impactMap[key];
       impactLines.push(`- ${name}: ${oldStock} -> ${oldStock + change}`);
     }
-
     const confirmationMessage = `Anda akan mencatat penjualan:\n\n[BARANG TERJUAL]\n${saleSummaryLines.join('\n')}\n\n[DAMPAK PADA STOK]\n${impactLines.join('\n')}\n\nLanjutkan?`.trim().replace(/^\s+/gm, '');
-
     if (window.confirm(confirmationMessage)) {
       const success = await invokeFunction('record-sale', { items: itemsToSell, saleSummary: saleSummaryLines, impactSummary: impactLines });
       if (success) { alert('Penjualan berhasil dicatat!'); setSaleQuantities({}); await fetchData(); }
@@ -214,7 +197,8 @@ export default function App({ user }: AppProps) {
             {categories.map(category => (<>
               <tr key={`cat-header-${category.id}`} className="category-header"><td colSpan={3}>{category.name}</td></tr>
               {products.filter(p => p.category_id === category.id).map(p => (
-                <tr key={p.id} className={getStockRowClass(p.stock, p.name)} onTouchStart={() => {}}>
+                // Teruskan seluruh objek produk 'p' ke getStockRowClass
+                <tr key={p.id} className={getStockRowClass(p.stock, p)} onTouchStart={() => {}}>
                   <td data-label="Produk">{p.name}</td><td data-label="SKU">{p.sku}</td><td data-label="Stok">{p.stock}</td>
                 </tr>
               ))}
@@ -249,7 +233,8 @@ export default function App({ user }: AppProps) {
           <thead><tr><th>Komponen</th><th>Stok</th><th>Satuan</th><th>Aksi</th></tr></thead>
           <tbody>
             {components.map(c => (
-              <tr key={c.id} className={getStockRowClass(c.stock, c.name)} onTouchStart={() => {}}>
+              // Teruskan seluruh objek komponen 'c' ke getStockRowClass
+              <tr key={c.id} className={getStockRowClass(c.stock, c)} onTouchStart={() => {}}>
                 <td data-label="Komponen">{c.name}</td><td data-label="Stok">{c.stock}</td><td data-label="Satuan">{c.unit}</td>
                 <td className="action-cell" data-label="Aksi">
                   <button className="modify-stock-btn subtract" onClick={() => handleModifyComponentStock(c, 'subtract')} disabled={isSubmitting || c.stock === 0}>-</button>
@@ -285,24 +270,9 @@ export default function App({ user }: AppProps) {
                     {log.description}
                     {log.details && (
                       <small className="log-details">
-                        {log.details.sale_summary && (
-                          <>
-                            <strong>Barang Terjual:</strong>
-                            {log.details.sale_summary.map((d, i) => <span key={`s${i}`}>{d}</span>)}
-                          </>
-                        )}
-                        {log.details.production_summary && (
-                          <>
-                            <strong>Hasil Produksi:</strong>
-                            {log.details.production_summary.map((d, i) => <span key={`p${i}`}>{d}</span>)}
-                          </>
-                        )}
-                        {log.details.impact_summary && (
-                          <>
-                            <strong>Dampak Stok:</strong>
-                            {log.details.impact_summary.map((d, i) => <span key={`i${i}`}>{d}</span>)}
-                          </>
-                        )}
+                        {log.details.sale_summary && (<><strong>Barang Terjual:</strong>{log.details.sale_summary.map((d, i) => <span key={`s${i}`}>{d}</span>)}</>)}
+                        {log.details.production_summary && (<><strong>Hasil Produksi:</strong>{log.details.production_summary.map((d, i) => <span key={`p${i}`}>{d}</span>)}</>)}
+                        {log.details.impact_summary && (<><strong>Dampak Stok:</strong>{log.details.impact_summary.map((d, i) => <span key={`i${i}`}>{d}</span>)}</>)}
                       </small>
                     )}
                   </td>

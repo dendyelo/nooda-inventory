@@ -1,4 +1,4 @@
-// File: supabase/functions/record-sale/index.ts (Versi Final Stabil)
+// File: supabase/functions/record-sale/index.ts (Perbaikan Log)
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
@@ -74,8 +74,13 @@ Deno.serve(async (req ) => {
       }
     }
 
-    // Jika semua berhasil, catat log aktivitas
-    const description = `Penjualan ${saleSummary.length > 1 ? `${saleSummary.length} jenis item` : '1 item'} dicatat.`;
+    // ========================================================================
+    //      PERUBAHAN LOGIKA DESKRIPSI LOG ADA DI SINI
+    // ========================================================================
+    const totalQuantitySold = items.reduce((sum, item) => sum + item.quantity, 0);
+    const description = `Penjualan ${totalQuantitySold} item dicatat.`;
+    // ========================================================================
+
     const { error: logError } = await supabase.from('activity_logs').insert({
       action_type: 'SALE',
       description: description,

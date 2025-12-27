@@ -66,11 +66,12 @@ button:disabled {
 /*      TATA LETAK UTAMA & KOMPONEN UI                                      */
 /* ======================================================================== */
 .App {
-  width: 100%; /* Memastikan .App mengisi lebar #root */
   max-width: 1200px;
-  margin: 0 auto; /* Sekarang ini akan berfungsi! */
+  margin: 0 auto;
   padding: 2rem;
   text-align: left;
+  background-color: #f0f2f5;
+  min-height: 100vh;
   box-sizing: border-box;
 }
 

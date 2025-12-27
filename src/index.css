@@ -1,11 +1,17 @@
+/* File: src/index.css (Versi Final Diperbaiki) */
+
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
+  /*
+    Skema warna gelap/terang default dari template.
+    Ini bisa disesuaikan atau dihapus jika Anda tidak memerlukannya.
+  */
   color-scheme: light dark;
   color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  /* background-color dipindahkan ke body untuk kontrol yang lebih baik */
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -22,13 +28,30 @@ a:hover {
   color: #535bf2;
 }
 
+/* ==================================================================== */
+/*      PERBAIKAN UTAMA ADA DI SINI                                     */
+/* ==================================================================== */
+
+/*
+  Aturan 'body' bawaan telah disederhanakan.
+  Kita menghapus 'display: flex' dan 'place-items: center' yang menyebabkan masalah.
+*/
 body {
   margin: 0;
+  background-color: #f0f2f5; /* Latar belakang global untuk aplikasi */
+}
+
+/*
+  Aturan baru untuk '#root' untuk memastikan ia menjadi fondasi yang stabil
+  dan mengisi seluruh tinggi layar.
+*/
+#root {
   display: flex;
-  place-items: center;
-  min-width: 320px;
+  flex-direction: column;
   min-height: 100vh;
 }
+
+/* ==================================================================== */
 
 h1 {
   font-size: 3.2em;
@@ -54,10 +77,11 @@ button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
+/* Media query untuk mode terang (opsional, bisa disesuaikan) */
 @media (prefers-color-scheme: light) {
   :root {
     color: #213547;
-    background-color: #ffffff;
+    /* background-color di sini tidak lagi diperlukan karena sudah di body */
   }
   a:hover {
     color: #747bff;
@@ -65,4 +89,46 @@ button:focus-visible {
   button {
     background-color: #f9f9f9;
   }
+}
+
+/* ==================================================================== */
+/*      GAYA UNTUK LAYAR STATUS (SUDAH BENAR)                           */
+/* ==================================================================== */
+
+/* Kelas untuk layar pemuatan dan kesalahan umum */
+.fullscreen-centered-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  width: 100vw;
+  padding: 20px;
+  text-align: center;
+  /* background-color di sini bisa dihapus karena body sudah menanganinya,
+     tapi membiarkannya juga tidak masalah. */
+  background-color: #f0f2f5;
+}
+
+/* Kelas khusus untuk tata letak vertikal di layar kesalahan */
+.error-layout {
+  flex-direction: column;
+}
+
+.error-title {
+  color: #d9534f;
+  margin-bottom: 1rem;
+}
+
+.error-message {
+  color: #333;
+  max-width: 600px;
+}
+
+.reload-button {
+  margin-top: 20px;
+  padding: 10px 20px;
+  cursor: pointer;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  background-color: #fff;
 }

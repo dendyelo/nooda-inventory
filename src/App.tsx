@@ -168,8 +168,25 @@ export default function App({ user }: AppProps) {
     setSaleQuantities(prev => ({ ...prev, [productId]: isNaN(quantity) ? 0 : Math.max(0, quantity) }));
   };
 
-  if (loading) return <div>Memuat data...</div>;
-  if (error) return <div>Terjadi Kesalahan: {error}</div>;
+  if (loading) {
+    return <div className="fullscreen-centered-container">Memuat...</div>;
+  }
+
+  if (error) {
+    // Gabungkan dua kelas untuk mendapatkan tata letak yang benar
+    return (
+      <div className="fullscreen-centered-container error-layout">
+        <h2 className="error-title">Terjadi Kesalahan</h2>
+        <p className="error-message">{error}</p>
+        <button 
+          className="reload-button"
+          onClick={() => window.location.reload()} 
+        >
+          Muat Ulang Halaman
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="App">

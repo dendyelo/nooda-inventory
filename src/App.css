@@ -260,8 +260,13 @@ button:disabled {
 }
 /* ======================================================================== */
 
+.components-table-container {
+  max-height: 800px; /* <-- Anda bisa atur ini ke 700px, 800px, dll. */
+  overflow-y: auto;
+}
+
 .log-table-container {
-  max-height: 800px;
+  max-height: 400px;
   overflow-y: auto;
 }
 .app-footer {

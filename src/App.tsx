@@ -248,7 +248,7 @@ export default function App({ user }: AppProps) {
           ))}
         </div>
         {/* Perbaikan: Menambahkan div pembungkus luar untuk scrolling vertikal */}
-        <div className="log-table-container">
+        <div className="components-table-container">
           <div className="table-container">
             <table className="stock-table">
               <thead><tr><th>Komponen</th><th>Stok</th><th>Satuan</th><th>Aksi</th></tr></thead>

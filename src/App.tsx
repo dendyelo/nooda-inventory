@@ -15,7 +15,7 @@ type ActivityLog = { id: number; created_at: string; description: string; userna
 const getStockRowClass = (stock: number, item: StockItem): string => {
   const warningLimit = item.warning_limit;
   if (stock === 0) return 'stock-danger';
-  if (warningLimit !== null && stock < warningLimit) return 'stock-warning';
+  if (warningLimit !== null && stock <= warningLimit) return 'stock-warning';
   return '';
 };
 

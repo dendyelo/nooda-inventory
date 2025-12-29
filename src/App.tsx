@@ -1,4 +1,4 @@
-// File: src/App.tsx (Versi 9.0.1 - Tab Dinamis & Perbaikan Log)
+// File: src/App.tsx (Versi 9.0.2 - Final dengan Semua Perbaikan)
 
 import { useState, useEffect, type FormEvent } from 'react';
 import { supabase } from './lib/supabaseClient';
@@ -24,7 +24,7 @@ type SaleQuantities = { [productId: number]: number; };
 type AppProps = { user: User; };
 
 export default function App({ user }: AppProps) {
-  const APP_VERSION = "v9.0.1";
+  const APP_VERSION = "v9.0.2";
 
   const [components, setComponents] = useState<Component[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -247,23 +247,26 @@ export default function App({ user }: AppProps) {
             </button>
           ))}
         </div>
-        <div className="table-container">
-          <table className="stock-table">
-            <thead><tr><th>Komponen</th><th>Stok</th><th>Satuan</th><th>Aksi</th></tr></thead>
-            <tbody>
-              {components
-                .filter(c => c.usage_type === activeComponentTabKey)
-                .map(c => (
-                  <tr key={c.id} className={getStockRowClass(c)} onTouchStart={() => {}}>
-                    <td data-label="Komponen">{c.name}</td><td data-label="Stok">{c.stock}</td><td data-label="Satuan">{c.unit}</td>
-                    <td className="action-cell" data-label="Aksi">
-                      <button className="modify-stock-btn subtract" onClick={() => handleModifyComponentStock(c, 'subtract')} disabled={isSubmitting || c.stock === 0}>-</button>
-                      <button className="modify-stock-btn add" onClick={() => handleModifyComponentStock(c, 'add')} disabled={isSubmitting}>+</button>
-                    </td>
-                  </tr>
-              ))}
-            </tbody>
-          </table>
+        {/* Perbaikan: Menambahkan div pembungkus luar untuk scrolling vertikal */}
+        <div className="log-table-container">
+          <div className="table-container">
+            <table className="stock-table">
+              <thead><tr><th>Komponen</th><th>Stok</th><th>Satuan</th><th>Aksi</th></tr></thead>
+              <tbody>
+                {components
+                  .filter(c => c.usage_type === activeComponentTabKey)
+                  .map(c => (
+                    <tr key={c.id} className={getStockRowClass(c)} onTouchStart={() => {}}>
+                      <td data-label="Komponen">{c.name}</td><td data-label="Stok">{c.stock}</td><td data-label="Satuan">{c.unit}</td>
+                      <td className="action-cell" data-label="Aksi">
+                        <button className="modify-stock-btn subtract" onClick={() => handleModifyComponentStock(c, 'subtract')} disabled={isSubmitting || c.stock === 0}>-</button>
+                        <button className="modify-stock-btn add" onClick={() => handleModifyComponentStock(c, 'add')} disabled={isSubmitting}>+</button>
+                      </td>
+                    </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -280,7 +283,6 @@ export default function App({ user }: AppProps) {
 
       <div className="section-container">
         <h2>Log Aktivitas Terbaru</h2>
-        {/* Perbaikan: Menggunakan dua div pembungkus untuk scrolling vertikal dan horizontal */}
         <div className="log-table-container">
           <div className="table-container">
             <table className="stock-table log-table">

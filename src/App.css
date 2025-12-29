@@ -1,4 +1,4 @@
-/* File: src/App.css (Versi Final - Dengan Perbaikan Form Penjualan) */
+/* File: src/App.css (Versi 9.0.1 - Dengan Gaya Tab) */
 
 /* ======================================================================== */
 /*      GAYA DASAR                                                          */
@@ -70,7 +70,7 @@ button:disabled {
   margin: 0 auto;
   padding: 2rem;
   text-align: left;
-  background-color: #f0f2f5;
+  /* background-color: #f0f2f5; Dihapus karena sudah di body */
   min-height: 100vh;
   box-sizing: border-box;
 }
@@ -113,8 +113,10 @@ button:disabled {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
-.table-wrapper {
+.table-container {
+  width: 100%;
   overflow-x: auto; /* Memungkinkan scroll horizontal jika konten terlalu lebar */
+  -webkit-overflow-scrolling: touch; /* Guliran mulus di iOS */
 }
 
 /* ======================================================================== */
@@ -123,7 +125,7 @@ button:disabled {
 .stock-table {
   width: 100%;
   border-collapse: collapse;
-  margin-bottom: 1.5rem;
+  /* margin-bottom: 1.5rem; Dihapus agar konsisten di dalam container */
 }
 
 .stock-table th, .stock-table td {
@@ -162,23 +164,14 @@ button:disabled {
   background-color: #f8f9fa;
   padding: 1rem;
   border-radius: 8px;
-  margin-top: 1rem;
+  margin-top: 1.5rem;
 }
 
-/* Aturan khusus untuk form penjualan agar vertikal */
 .sale-panel form {
   display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 1rem;
-}
-
-/* Aturan umum untuk form lain (seperti produksi) agar tetap horizontal */
-.form-panel form:not(.sale-panel form) {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
 }
 
 .form-panel input, .form-panel select {
@@ -193,6 +186,7 @@ button:disabled {
 .sale-input-table {
   width: 100%;
   border-collapse: collapse;
+  margin-bottom: 1rem;
 }
 .quantity-input {
   width: 80px;
@@ -201,7 +195,7 @@ button:disabled {
 .submit-sale-btn {
   width: 100%;
   padding: 1em;
-  margin-top: 0; /* Hapus margin atas karena sudah diatur oleh 'gap' */
+  margin-top: 0;
   background-color: #28a745;
   color: white;
   border: none;
@@ -228,6 +222,43 @@ button:disabled {
 .modify-stock-btn.add:hover { background-color: #0069d9; }
 .modify-stock-btn.subtract { background-color: #6c757d; }
 .modify-stock-btn.subtract:hover { background-color: #5a6268; }
+
+/* ======================================================================== */
+/*      GAYA UNTUK TOMBOL TAB BAHAN BAKU (BARU)                             */
+/* ======================================================================== */
+.tab-buttons {
+  margin-bottom: 1.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  border-bottom: 1px solid #dee2e6;
+  padding-bottom: 1rem;
+}
+
+.tab-buttons button {
+  padding: 0.5rem 1rem;
+  border: 1px solid #ccc;
+  background-color: #fff;
+  cursor: pointer;
+  border-radius: 5px;
+  font-size: 0.9rem;
+  transition: all 0.2s ease-in-out;
+}
+
+.tab-buttons button:hover {
+  border-color: #aaa;
+  background-color: #f8f9fa;
+}
+
+.tab-buttons button.active {
+  background-color: #337ab7;
+  color: white;
+  border-color: #2e6da4;
+}
+.tab-buttons button.active:hover {
+  border-color: #2e6da4;
+}
+/* ======================================================================== */
 
 .log-table-container {
   max-height: 400px;
@@ -259,13 +290,13 @@ button:disabled {
   text-align: center;
 }
 .production-panel form button[type="submit"] {
-  background-color: #007bff; /* Biru Solid */
+  background-color: #007bff;
   color: white;
   border: none;
 }
 .production-panel form button[type="submit"]:hover {
-  background-color: #0056b3; /* Biru Solid yang lebih gelap saat hover */
-  border-color: transparent; /* Pastikan tidak ada border saat hover */
+  background-color: #0056b3;
+  border-color: transparent;
 }
 
 /* ======================================================================== */
@@ -274,13 +305,12 @@ button:disabled {
 
 @media screen and (max-width: 768px) {
 
-  /* Hanya target tabel yang memiliki kelas .log-table */
   .log-table thead {
-    display: none; /* Sembunyikan header di seluler */
+    display: none;
   }
 
   .log-table tr {
-    display: block; /* Ubah baris menjadi blok (kartu) */
+    display: block;
     margin-bottom: 1rem;
     border: 1px solid #e9ecef;
     border-radius: 8px;
@@ -289,21 +319,20 @@ button:disabled {
   }
 
   .log-table td {
-    display: block; /* Ubah sel menjadi blok */
-    text-align: right; /* Ratakan teks ke kanan */
+    display: block;
+    text-align: right;
     position: relative;
-    padding-left: 50%; /* Beri ruang untuk label */
+    padding-left: 50%;
     border-bottom: 1px solid #eee;
     padding-top: 0.5rem;
     padding-bottom: 0.5rem;
-    white-space: normal; /* Kembalikan white-space agar teks bisa wrap */
+    white-space: normal;
   }
 
   .log-table tr td:last-child {
-    border-bottom: none; /* Hapus border di sel terakhir */
+    border-bottom: none;
   }
 
-  /* Buat label dari atribut data-label di JSX */
   .log-table td::before {
     content: attr(data-label);
     position: absolute;
@@ -316,40 +345,36 @@ button:disabled {
 
 /* Gaya baru untuk header kategori di dalam tabel */
 .category-header td {
-  background-color: #e9ecef; /* Warna latar belakang abu-abu muda */
-  font-weight: 600;          /* Teks tebal */
-  color: #495057;             /* Warna teks abu-abu gelap */
-  border-bottom: 2px solid #dee2e6; /* Garis bawah yang lebih tebal */
-  padding-top: 0.5rem;       /* Padding atas yang lebih kecil */
-  padding-bottom: 0.5rem;    /* Padding bawah yang lebih kecil */
+  background-color: #e9ecef;
+  font-weight: 600;
+  color: #495057;
+  border-bottom: 2px solid #dee2e6;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
 }
 
-/* Hilangkan efek hover pada header kategori agar tidak interaktif */
 .category-header:hover,
 .category-header:active {
-  background-color: #e9ecef !important; /* Paksa warna latar tetap sama */
+  background-color: #e9ecef !important;
 }
 
 /* ======================================================================== */
 /*      GAYA LOG AKTIVITAS                                                  */
 /* ======================================================================== */
 
-/* Kontainer untuk semua detail di dalam sebuah log */
 .log-details {
-  display: block; /* Membuat <small> menjadi blok, menempati baris baru */
-  margin-top: 0.5rem; /* Memberi sedikit jarak dari deskripsi utama */
-  color: #6c757d; /* Warna teks sedikit lebih pudar */
+  display: block;
+  margin-top: 0.5rem;
+  color: #6c757d;
 }
 
-/* Judul di dalam detail log (misalnya, "Barang Terjual:", "Dampak Stok:") */
 .log-details strong {
-  display: block; /* Membuat <strong> menjadi blok, menempati baris baru */
-  margin-top: 0.25rem; /* Memberi jarak antar bagian detail */
+  display: block;
+  margin-top: 0.25rem;
   font-weight: 600;
 }
 
-/* Setiap baris item di dalam detail log */
 .log-details span {
-  display: block; /* Membuat <span> menjadi blok, menempati baris baru */
-  padding-left: 0.5rem; /* Sedikit indentasi agar terlihat rapi */
+  display: block;
+  padding-left: 0.5rem;
 }
